@@ -9,6 +9,9 @@ CONFIG_PATH = Path("./config.toml")
 
 class TreeSearchConfig(BaseSettings):
     num_draft_nodes: int = 3
+    debug_prob: float = 0.5
+    epsilon: float = 0.3
+    max_iterations: int = 10
 
 
 class ExecConfig(BaseSettings):
