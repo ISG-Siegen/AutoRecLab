@@ -266,7 +266,7 @@ class MinimalAgent:
     def _debug(self, parent_node: Node) -> Node:
         # Format node scores for the prompt
         score_info = ""
-        if hasattr(parent_node, 'score') and parent_node.score:
+        if hasattr(parent_node, "score") and parent_node.score:
             score_info = f"""
 Previous Implementation Scores:
 - Overall Score: {parent_node.score.overall_score}/10
@@ -275,9 +275,13 @@ Previous Implementation Scores:
 - Conceptual Correctness: {parent_node.score.conceptual_correctness_score}/10
 - Feedback: {parent_node.score.feedback}
 """
-        
+
         # Enhanced bug analysis for more helpful feedback
-        bug_analysis = parent_node.analysis if parent_node.analysis else "Bug analysis not available"
+        bug_analysis = (
+            parent_node.analysis
+            if parent_node.analysis
+            else "Bug analysis not available"
+        )
         if parent_node.is_buggy and parent_node.analysis:
             enhanced_bug_info = f"""
 Bug Analysis:
@@ -321,7 +325,7 @@ This indicates the code failed to execute properly. Focus on addressing the spec
     def _improve(self, parent_node: Node) -> Node:
         # Format node scores for the prompt
         score_info = ""
-        if hasattr(parent_node, 'score') and parent_node.score:
+        if hasattr(parent_node, "score") and parent_node.score:
             score_info = f"""
 Previous Implementation Scores:
 - Overall Score: {parent_node.score.overall_score}/10
@@ -329,9 +333,9 @@ Previous Implementation Scores:
 - Code Quality: {parent_node.score.code_quality_score}/10
 - Conceptual Correctness: {parent_node.score.conceptual_correctness_score}/10
 - Feedback: {parent_node.score.feedback}
-- Status: {'Satisfactory' if parent_node.score.is_satisfactory else 'Needs Improvement'}
+- Status: {"Satisfactory" if parent_node.score.is_satisfactory else "Needs Improvement"}
 """
-        
+
         prompt: Any = {
             "Introduction": (
                 "You are an experienced recommender systems researcher. You are provided with a previously developed "
@@ -352,10 +356,10 @@ Previous Implementation Scores:
             "Improvement guidelines": [
                 "Based on the scoring feedback above, focus on areas that need improvement:",
                 "- If Experiment Achievement is low: improve the core algorithm or experimental design",
-                "- If Code Quality is low: refactor for better structure, error handling, or efficiency", 
+                "- If Code Quality is low: refactor for better structure, error handling, or efficiency",
                 "- If Conceptual Correctness is low: review the approach and methodology",
                 "- Address any specific issues mentioned in the feedback",
-                "Your goal is to enhance the implementation while maintaining its working functionality."
+                "Your goal is to enhance the implementation while maintaining its working functionality.",
             ]
         }
         prompt["Instructions"] |= self._prompt_impl_guideline
@@ -513,17 +517,19 @@ Previous Implementation Scores:
             ),
             "Research Task": self.task_desc,
             "Implementation": wrap_code(node.code),
-            "Execution Output": wrap_code(node.term_out if node.term_out else "No output generated", lang=""),
+            "Execution Output": wrap_code(
+                node.term_out if node.term_out else "No output generated", lang=""
+            ),
             "Instructions": [
                 "Carefully analyze the execution output for signs of bugs or failures:",
-                "- Syntax errors, import errors, or runtime exceptions", 
+                "- Syntax errors, import errors, or runtime exceptions",
                 "- Missing required outputs or metrics",
                 "- Execution timeouts or crashes",
                 "- Incorrect or nonsensical results",
                 "",
                 "If there's a bug, provide a clear summary of the issue and suggest how to fix it.",
-                "If the execution was successful, leave the summary empty."
-            ]
+                "If the execution was successful, leave the summary empty.",
+            ],
         }
 
         try:
@@ -534,11 +540,11 @@ Previous Implementation Scores:
                 model=self.cfg.agent.feedback.model,
                 temperature=self.cfg.agent.feedback.temp,
             )
-            
+
             # Update node with review results
             node.is_buggy = review_result.get("is_bug", True)
             node.analysis = review_result.get("summary", "")
-            
+
             if node.is_buggy:
                 logger.info(f"Node identified as buggy: {node.analysis}")
                 # Create more helpful feedback for buggy nodes
@@ -554,7 +560,7 @@ NEXT STEPS FOR DEBUGGING:
 - Consider simplifying the code to isolate the issue
 
 This implementation scored 0/10 due to execution failure. Focus on resolving the error before optimizing."""
-                
+
                 # If buggy, set minimal scores and return early
                 node.score = NodeScore(
                     overall_score=0.0,
@@ -562,16 +568,16 @@ This implementation scored 0/10 due to execution failure. Focus on resolving the
                     code_quality_score=0.0,
                     conceptual_correctness_score=0.0,
                     feedback=helpful_feedback,
-                    is_satisfactory=False
+                    is_satisfactory=False,
                 )
                 return node
-                
+
         except Exception as e:
             logger.error(f"Error in code review: {e}")
             # Fallback: mark as buggy if analysis fails
             node.is_buggy = True
             node.analysis = f"Review analysis failed: {str(e)}"
-            
+
             fallback_feedback = f"""ANALYSIS SYSTEM ERROR:
 
 The automated review system encountered an error: {str(e)}
@@ -583,20 +589,20 @@ MANUAL REVIEW REQUIRED:
 - Test the code in smaller chunks to isolate any problems
 
 This implementation scored 0/10 due to analysis failure. Manual debugging recommended."""
-            
+
             node.score = NodeScore(
                 overall_score=0.0,
                 experiment_achievement_score=0.0,
                 code_quality_score=0.0,
                 conceptual_correctness_score=0.0,
                 feedback=fallback_feedback,
-                is_satisfactory=False
+                is_satisfactory=False,
             )
             return node
 
         # If not buggy, proceed with detailed scoring
         logger.info("Node execution successful, proceeding with detailed scoring")
-        
+
         # Define scoring categories
         scoring_categories = {
             "experiment_achievement": {
@@ -606,37 +612,39 @@ This implementation scored 0/10 due to analysis failure. Manual debugging recomm
                     "Implements the required algorithm/method correctly",
                     "Produces meaningful experimental results",
                     "Evaluates using appropriate metrics",
-                    "Completes without critical errors"
-                ]
+                    "Completes without critical errors",
+                ],
             },
             "code_quality": {
-                "name": "Code Quality", 
+                "name": "Code Quality",
                 "description": "Technical quality and structure of the implementation",
                 "criteria": [
                     "Clean, readable, and well-structured code",
                     "Proper error handling and edge cases",
                     "Efficient use of libraries and resources",
-                    "Follows best practices"
-                ]
+                    "Follows best practices",
+                ],
             },
             "conceptual_correctness": {
                 "name": "Conceptual Correctness",
-                "description": "Correctness of the underlying approach and methodology", 
+                "description": "Correctness of the underlying approach and methodology",
                 "criteria": [
                     "Correct understanding of the problem",
                     "Appropriate choice of methods/algorithms",
                     "Sound experimental design",
-                    "Valid interpretation of results"
-                ]
-            }
+                    "Valid interpretation of results",
+                ],
+            },
         }
 
         # Create scoring criteria summary
-        criteria_summary = "\n".join([
-            f"**{cat['name']}** (0-10): {cat['description']}\n" + 
-            "\n".join([f"  - {criterion}" for criterion in cat['criteria']])
-            for cat in scoring_categories.values()
-        ])
+        criteria_summary = "\n".join(
+            [
+                f"**{cat['name']}** (0-10): {cat['description']}\n"
+                + "\n".join([f"  - {criterion}" for criterion in cat["criteria"]])
+                for cat in scoring_categories.values()
+            ]
+        )
 
         scoring_prompt = {
             "Introduction": (
@@ -655,18 +663,18 @@ This implementation scored 0/10 due to analysis failure. Manual debugging recomm
                 "- 0: Complete failure or critical errors",
                 "- 1-3: Major issues preventing success",
                 "- 4-6: Partial implementation with significant problems",
-                "- 7-8: Good implementation with minor issues", 
+                "- 7-8: Good implementation with minor issues",
                 "- 9-10: Excellent implementation",
                 "",
                 "Since the code executed successfully, focus on quality and correctness.",
                 "",
                 "RESPONSE FORMAT - You MUST structure your response as follows:",
                 "EXPERIMENT_ACHIEVEMENT: [score 0-10]",
-                "CODE_QUALITY: [score 0-10]", 
+                "CODE_QUALITY: [score 0-10]",
                 "CONCEPTUAL_CORRECTNESS: [score 0-10]",
                 "OVERALL_SCORE: [average of above three scores]",
-                "FEEDBACK: [Short feedback with specific improvement suggestions]"
-            ]
+                "FEEDBACK: [Short feedback with specific improvement suggestions]",
+            ],
         }
 
         try:
@@ -674,15 +682,15 @@ This implementation scored 0/10 due to analysis failure. Manual debugging recomm
                 system_message=scoring_prompt,
                 user_message=None,
                 model=self.cfg.agent.feedback.model,
-                temperature=self.cfg.agent.feedback.temp
+                temperature=self.cfg.agent.feedback.temp,
             )
 
             # Parse the structured response
             scoring_result = self._parse_scoring(scoring_text)
-            
+
             # Update node with scoring information
             node.score = scoring_result
-            
+
         except Exception as e:
             logger.error(f"Error in scoring: {e}")
             # Fallback scoring for successful but unscored code
@@ -692,11 +700,11 @@ This implementation scored 0/10 due to analysis failure. Manual debugging recomm
                 code_quality_score=5.0,
                 conceptual_correctness_score=5.0,
                 feedback=f"Scoring failed but code executed successfully: {str(e)}",
-                is_satisfactory=False
+                is_satisfactory=False,
             )
-        
+
         return node
-    
+
     def _parse_scoring(self, scoring_text: str) -> NodeScore:
         """Parse structured scoring response into components."""
         # Initialize default values
@@ -706,51 +714,77 @@ This implementation scored 0/10 due to analysis failure. Manual debugging recomm
         conceptual_correctness_score = 0.0
         feedback = scoring_text
         is_satisfactory = False
-        
+
         try:
             # Extract scores using regex
-            exp_match = re.search(r'EXPERIMENT_ACHIEVEMENT:\s*(\d+(?:\.\d+)?)', scoring_text, re.IGNORECASE)
-            qual_match = re.search(r'CODE_QUALITY:\s*(\d+(?:\.\d+)?)', scoring_text, re.IGNORECASE)
-            concept_match = re.search(r'CONCEPTUAL_CORRECTNESS:\s*(\d+(?:\.\d+)?)', scoring_text, re.IGNORECASE)
-            overall_match = re.search(r'OVERALL_SCORE:\s*(\d+(?:\.\d+)?)', scoring_text, re.IGNORECASE)
-            
+            exp_match = re.search(
+                r"EXPERIMENT_ACHIEVEMENT:\s*(\d+(?:\.\d+)?)",
+                scoring_text,
+                re.IGNORECASE,
+            )
+            qual_match = re.search(
+                r"CODE_QUALITY:\s*(\d+(?:\.\d+)?)", scoring_text, re.IGNORECASE
+            )
+            concept_match = re.search(
+                r"CONCEPTUAL_CORRECTNESS:\s*(\d+(?:\.\d+)?)",
+                scoring_text,
+                re.IGNORECASE,
+            )
+            overall_match = re.search(
+                r"OVERALL_SCORE:\s*(\d+(?:\.\d+)?)", scoring_text, re.IGNORECASE
+            )
+
             # Extract feedback
-            feedback_match = re.search(r'FEEDBACK:\s*(.*?)(?=\n[A-Z_]+:|$)', scoring_text, re.DOTALL | re.IGNORECASE)
-            
+            feedback_match = re.search(
+                r"FEEDBACK:\s*(.*?)(?=\n[A-Z_]+:|$)",
+                scoring_text,
+                re.DOTALL | re.IGNORECASE,
+            )
+
             # Parse individual scores (0-10 scale)
             if exp_match:
-                experiment_achievement_score = min(10.0, max(0.0, float(exp_match.group(1))))
+                experiment_achievement_score = min(
+                    10.0, max(0.0, float(exp_match.group(1)))
+                )
             if qual_match:
                 code_quality_score = min(10.0, max(0.0, float(qual_match.group(1))))
             if concept_match:
-                conceptual_correctness_score = min(10.0, max(0.0, float(concept_match.group(1))))
-            
+                conceptual_correctness_score = min(
+                    10.0, max(0.0, float(concept_match.group(1)))
+                )
+
             # Calculate overall score as average if not provided
             if overall_match:
                 overall_score = min(10.0, max(0.0, float(overall_match.group(1))))
             else:
-                scores = [experiment_achievement_score, code_quality_score, conceptual_correctness_score]
+                scores = [
+                    experiment_achievement_score,
+                    code_quality_score,
+                    conceptual_correctness_score,
+                ]
                 overall_score = sum(scores) / len(scores) if scores else 0.0
-            
+
             # Parse feedback
             if feedback_match:
                 feedback = feedback_match.group(1).strip()
-            
+
             # Determine if satisfactory (score >= 7.0 is considered good)
-            is_satisfactory = overall_score >= 7.5
-                
+            is_satisfactory = (
+                overall_score >= self.cfg.treesearch.satisfactory_threshold
+            )
+
         except Exception as e:
             logger.warning(f"Failed to parse scoring structure: {e}")
             # Keep default values
             feedback = f"Failed to parse scoring: {scoring_text}"
-        
+
         return NodeScore(
             overall_score=overall_score,
             experiment_achievement_score=experiment_achievement_score,
             code_quality_score=code_quality_score,
             conceptual_correctness_score=conceptual_correctness_score,
             feedback=feedback,
-            is_satisfactory=is_satisfactory
+            is_satisfactory=is_satisfactory,
         )
 
     def _generate_plotting_code(
