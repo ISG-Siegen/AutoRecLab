@@ -63,7 +63,7 @@ class MinimalAgent:
             "numpy==1.26.4",
             "numba==0.58.1",
             "pandas==2.3.2",
-            "scipy==1.16.1",
+            "scipy==1.16.2",
             "scikit-learn==1.7.1",
             "lenskit==0.14.4",
         ]
@@ -537,8 +537,8 @@ Previous Implementation Scores:
                 system_message=review_prompt,
                 user_message=None,
                 func_spec=review_func_spec,
-                model=self.cfg.agent.feedback.model,
-                temperature=self.cfg.agent.feedback.temp,
+                model=self.cfg.agent.code.model,
+                temperature=self.cfg.agent.code.model_temp,
             )
 
             # Update node with review results
@@ -654,7 +654,8 @@ This implementation scored 0/10 due to analysis failure. Manual debugging recomm
                 "Provide objective, constructive feedback."
             ),
             "Research Task": self.task_desc,
-            "Required Metrics": f"Must evaluate: {', '.join(self.evaluation_metrics)}",
+            # HACK:
+            # "Required Metrics": f"Must evaluate: {', '.join(self.evaluation_metrics)}",
             "Implementation": wrap_code(node.code),
             "Execution Output": wrap_code(node.term_out, lang=""),
             "Scoring Categories": criteria_summary,
@@ -681,8 +682,8 @@ This implementation scored 0/10 due to analysis failure. Manual debugging recomm
             scoring_text = query(
                 system_message=scoring_prompt,
                 user_message=None,
-                model=self.cfg.agent.feedback.model,
-                temperature=self.cfg.agent.feedback.temp,
+                model=self.cfg.agent.code.model,
+                temperature=self.cfg.agent.code.model_temp,
             )
 
             # Parse the structured response
@@ -695,13 +696,15 @@ This implementation scored 0/10 due to analysis failure. Manual debugging recomm
             logger.error(f"Error in scoring: {e}")
             # Fallback scoring for successful but unscored code
             node.score = NodeScore(
-                overall_score=5.0,
-                experiment_achievement_score=5.0,
-                code_quality_score=5.0,
-                conceptual_correctness_score=5.0,
+                overall_score=0.0,
+                experiment_achievement_score=0.0,
+                code_quality_score=0.0,
+                conceptual_correctness_score=0.0,
                 feedback=f"Scoring failed but code executed successfully: {str(e)}",
                 is_satisfactory=False,
             )
+
+        print(node.score)
 
         return node
 
