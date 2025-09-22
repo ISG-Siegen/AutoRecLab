@@ -1,7 +1,8 @@
 import re
 from dataclasses import dataclass
-from typing import TypeAlias
+from typing import Callable, TypeAlias
 
+import backoff
 import black
 import jsonschema
 from dataclasses_json import DataClassJsonMixin
@@ -154,3 +155,29 @@ def format_code(code) -> str:
         return black.format_str(code, mode=black.FileMode())
     except black.parsing.InvalidInput:  # type: ignore
         return code
+
+
+@backoff.on_predicate(
+    wait_gen=backoff.expo,
+    max_value=60,
+    factor=1.5,
+)
+def backoff_create(
+    create_fn: Callable, retry_exceptions: list[Exception], *args, **kwargs
+):
+    try:
+        return create_fn(*args, **kwargs)
+    except retry_exceptions as e:
+        logger.info(f"Backoff exception: {e}")
+        return False
+
+
+def opt_messages_to_list(
+    system_message: str | None, user_message: str | None
+) -> list[dict[str, str]]:
+    messages = []
+    if system_message:
+        messages.append({"role": "system", "content": system_message})
+    if user_message:
+        messages.append({"role": "user", "content": user_message})
+    return messages

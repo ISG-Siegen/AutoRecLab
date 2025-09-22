@@ -1,9 +1,10 @@
-import time
 import os
+import time
 
-from .utils import FunctionSpec, OutputType, opt_messages_to_list, backoff_create
-from funcy import notnone, once, select_values
 import anthropic
+from funcy import notnone, once, select_values
+
+from .utils import FunctionSpec, OutputType, backoff_create, opt_messages_to_list
 
 # _client: anthropic.Anthropic = None  # type: ignore
 _client: anthropic.AnthropicBedrock = None  # type: ignore
