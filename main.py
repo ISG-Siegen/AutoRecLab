@@ -11,9 +11,14 @@ def main():
     config = load_config()
 
     # TODO:
-    task_desc = "Some task description lorem ipsum dolor"
+    user_request = (
+        "Which of these LensKit algorithms performs the best on MovieLens100K?"
+        "- ItemItem"
+        "- BiasedMF"
+        "I placed the 'u.data' file of MovieLens100K in your current working directory. You can load it from there!"
+    )
 
-    ts = TreeSearch(task_desc, config)
+    ts = TreeSearch(user_request, config)
     ts.run()
 
 
