@@ -10,6 +10,7 @@ from treesearch.interpreter import ExecutionResult
 from treesearch.metric import MetricValue
 from treesearch.utils.response import trim_long_string
 
+
 @dataclass
 class NodeScore:
     overall_score: float = 0.0
@@ -18,7 +19,6 @@ class NodeScore:
     conceptual_correctness_score: float = 0.0
     feedback: str = ""
     is_satisfactory: bool = False
-
 
 
 @dataclass(eq=False, kw_only=True)
@@ -106,11 +106,9 @@ class Node(NodeMixin):
         if len(self.plan) > 0:
             plan_max_chars = 25
             dots = "..." if len(self.plan) > plan_max_chars else ""
-            return (
-                f"{__class__.__name__}({short_id}, {self.plan[:plan_max_chars]}{dots})"
-            )
+            return f"{__class__.__name__}({short_id},\n{self.plan[:plan_max_chars]}{dots}\nbuggy={self.is_buggy})"
         else:
-            return f"{__class__.__name__}({short_id})"
+            return f"{__class__.__name__}({short_id}\nbuggy={self.is_buggy})"
 
     def __post_init__(self):
         self.parent = self._parent
