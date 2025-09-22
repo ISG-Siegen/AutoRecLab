@@ -33,7 +33,7 @@ class TreeSearch:
         for _ in range(self._config.treesearch.num_draft_nodes):
             draft_node = minimal_agent._draft()
             exec_result = interpreter.run(draft_node.code)
-            minimal_agent.parse_exec_result(draft_node, exec_result, self._workspace)
+            minimal_agent.score_code(draft_node, exec_result)
 
         """ TODO:
         - [x] Execute/eval subroutine on draft nodes:

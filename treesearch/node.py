@@ -10,6 +10,16 @@ from treesearch.interpreter import ExecutionResult
 from treesearch.metric import MetricValue
 from treesearch.utils.response import trim_long_string
 
+@dataclass
+class NodeScore:
+    overall_score: float = 0.0
+    experiment_achievement_score: float = 0.0
+    code_quality_score: float = 0.0
+    conceptual_correctness_score: float = 0.0
+    feedback: str = ""
+    is_satisfactory: bool = False
+
+
 
 @dataclass(eq=False, kw_only=True)
 class Node(NodeMixin):
@@ -28,6 +38,7 @@ class Node(NodeMixin):
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     ctime: float = field(default_factory=lambda: time.time())
     exp_results_dir: str = field(default=None)  # type: ignore
+    score: NodeScore = field(default_factory=NodeScore)
 
     # ---- execution info ----
     _term_out: list[str] = field(default=None)  # type: ignore

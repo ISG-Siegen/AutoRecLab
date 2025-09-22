@@ -1,6 +1,7 @@
 import base64
 import os
 import random
+import re
 from typing import Any, Optional, cast
 
 import humanize
@@ -14,7 +15,7 @@ from treesearch.function_specs import (
     vlm_feedback_spec,
 )
 from treesearch.interpreter import ExecutionResult
-from treesearch.node import Node
+from treesearch.node import Node, NodeScore
 from treesearch.utils.response import wrap_code
 from utils.log import _ROOT_LOGGER
 
@@ -263,6 +264,30 @@ class MinimalAgent:
         return Node(plan=plan, code=code)
 
     def _debug(self, parent_node: Node) -> Node:
+        # Format node scores for the prompt
+        score_info = ""
+        if hasattr(parent_node, 'score') and parent_node.score:
+            score_info = f"""
+Previous Implementation Scores:
+- Overall Score: {parent_node.score.overall_score}/10
+- Experiment Achievement: {parent_node.score.experiment_achievement_score}/10  
+- Code Quality: {parent_node.score.code_quality_score}/10
+- Conceptual Correctness: {parent_node.score.conceptual_correctness_score}/10
+- Feedback: {parent_node.score.feedback}
+"""
+        
+        # Enhanced bug analysis for more helpful feedback
+        bug_analysis = parent_node.analysis if parent_node.analysis else "Bug analysis not available"
+        if parent_node.is_buggy and parent_node.analysis:
+            enhanced_bug_info = f"""
+Bug Analysis:
+{bug_analysis}
+
+This indicates the code failed to execute properly. Focus on addressing the specific error mentioned above.
+"""
+        else:
+            enhanced_bug_info = f"Previous implementation had issues: {bug_analysis}"
+
         prompt: Any = {
             "Introduction": (
                 "You are an experienced recommender systems researcher. Your previous code for research experiment had a bug, so based on the information below, you should revise it in order to fix this bug. "
@@ -272,7 +297,7 @@ class MinimalAgent:
             "Research idea": self.task_desc,
             "Previous (buggy) implementation": wrap_code(parent_node.code),
             "Execution output": wrap_code(parent_node.term_out, lang=""),
-            "Feedback based on generated plots": parent_node.vlm_feedback_summary,
+            "Bug Analysis & Scoring": enhanced_bug_info + score_info,
             "Feedback about execution time": parent_node.exec_time_feedback,
             "Instructions": {},
         }
@@ -280,6 +305,8 @@ class MinimalAgent:
         prompt["Instructions"] |= {
             "Bugfix improvement sketch guideline": [
                 "You should write a brief natural language description (3-5 sentences) of how the issue in the previous implementation can be fixed.",
+                "Pay special attention to the bug analysis and scoring feedback provided above.",
+                "Address the specific errors or issues identified in the execution output.",
                 "Don't suggest to do EDA.",
             ],
         }
@@ -292,14 +319,27 @@ class MinimalAgent:
         return Node(plan=plan, code=code, _parent=parent_node)
 
     def _improve(self, parent_node: Node) -> Node:
+        # Format node scores for the prompt
+        score_info = ""
+        if hasattr(parent_node, 'score') and parent_node.score:
+            score_info = f"""
+Previous Implementation Scores:
+- Overall Score: {parent_node.score.overall_score}/10
+- Experiment Achievement: {parent_node.score.experiment_achievement_score}/10  
+- Code Quality: {parent_node.score.code_quality_score}/10
+- Conceptual Correctness: {parent_node.score.conceptual_correctness_score}/10
+- Feedback: {parent_node.score.feedback}
+- Status: {'Satisfactory' if parent_node.score.is_satisfactory else 'Needs Improvement'}
+"""
+        
         prompt: Any = {
             "Introduction": (
-                "You are an experienced AI researcher. You are provided with a previously developed "
+                "You are an experienced recommender systems researcher. You are provided with a previously developed "
                 "implementation. Your task is to improve it based on the current experimental stage."
             ),
             "Research idea": self.task_desc,
             "Memory": self.memory_summary if self.memory_summary else "",
-            "Feedback based on generated plots": parent_node.vlm_feedback_summary,
+            "Performance Analysis & Scoring": score_info,
             "Feedback about execution time": parent_node.exec_time_feedback,
             "Instructions": {},
         }
@@ -308,6 +348,16 @@ class MinimalAgent:
         }
 
         prompt["Instructions"] |= self._prompt_resp_fmt
+        prompt["Instructions"] |= {
+            "Improvement guidelines": [
+                "Based on the scoring feedback above, focus on areas that need improvement:",
+                "- If Experiment Achievement is low: improve the core algorithm or experimental design",
+                "- If Code Quality is low: refactor for better structure, error handling, or efficiency", 
+                "- If Conceptual Correctness is low: review the approach and methodology",
+                "- Address any specific issues mentioned in the feedback",
+                "Your goal is to enhance the implementation while maintaining its working functionality."
+            ]
+        }
         prompt["Instructions"] |= self._prompt_impl_guideline
 
         plan, code = self.plan_and_code_query(prompt)
@@ -451,42 +501,257 @@ class MinimalAgent:
         print("Final plan + code extraction attempt failed, giving up...")
         return "", completion_text  # type: ignore
 
-    def parse_exec_result(
-        self, node: Node, exec_result: ExecutionResult, workspace: str
-    ):
-        logger.info(f"Agent is parsing execution results for node {node.id}")
-
+    def score_code(self, node: Node, exec_result: ExecutionResult) -> Node:
+        """Analyze execution results using both review function spec and scoring system."""
         node.absorb_exec_result(exec_result)
-
-        prompt = {
+        # First, use the review_func_spec for elegant buggy node identification
+        review_prompt = {
             "Introduction": (
-                "You are an experienced recommender systems researcher. "
-                "You have written code for your research experiment and now need to evaluate the output of the code execution. "
-                "Analyze the execution output, determine if there were any bugs, and provide a summary of the findings. "
+                "You are an expert recommender systems researcher conducting a code review. "
+                "Your task is to evaluate whether the code execution was successful or contains bugs. "
+                "Focus on identifying execution failures, errors, or other issues that would prevent the code from working properly."
             ),
-            "Research idea": self.task_desc,
+            "Research Task": self.task_desc,
             "Implementation": wrap_code(node.code),
-            "Execution output": wrap_code(node.term_out, lang=""),
+            "Execution Output": wrap_code(node.term_out if node.term_out else "No output generated", lang=""),
+            "Instructions": [
+                "Carefully analyze the execution output for signs of bugs or failures:",
+                "- Syntax errors, import errors, or runtime exceptions", 
+                "- Missing required outputs or metrics",
+                "- Execution timeouts or crashes",
+                "- Incorrect or nonsensical results",
+                "",
+                "If there's a bug, provide a clear summary of the issue and suggest how to fix it.",
+                "If the execution was successful, leave the summary empty."
+            ]
         }
 
-        response = cast(
-            dict,
-            query(
-                system_message=prompt,
+        try:
+            review_result = query(
+                system_message=review_prompt,
                 user_message=None,
                 func_spec=review_func_spec,
                 model=self.cfg.agent.feedback.model,
                 temperature=self.cfg.agent.feedback.temp,
-            ),
-        )
+            )
+            
+            # Update node with review results
+            node.is_buggy = review_result.get("is_bug", True)
+            node.analysis = review_result.get("summary", "")
+            
+            if node.is_buggy:
+                logger.info(f"Node identified as buggy: {node.analysis}")
+                # Create more helpful feedback for buggy nodes
+                helpful_feedback = f"""EXECUTION FAILURE DETECTED:
 
-        node.analysis = response["summary"]
-        node.is_buggy = response["is_bug"] or node.exc_type is not None
-        print(
-            "[red]Checking if response contains metric name and description[/red]",
-            flush=True,
+{node.analysis}
+
+NEXT STEPS FOR DEBUGGING:
+- Review the error message above carefully
+- Check for missing imports or incorrect package names
+- Verify variable names and function calls
+- Ensure all required data files are accessible
+- Consider simplifying the code to isolate the issue
+
+This implementation scored 0/10 due to execution failure. Focus on resolving the error before optimizing."""
+                
+                # If buggy, set minimal scores and return early
+                node.score = NodeScore(
+                    overall_score=0.0,
+                    experiment_achievement_score=0.0,
+                    code_quality_score=0.0,
+                    conceptual_correctness_score=0.0,
+                    feedback=helpful_feedback,
+                    is_satisfactory=False
+                )
+                return node
+                
+        except Exception as e:
+            logger.error(f"Error in code review: {e}")
+            # Fallback: mark as buggy if analysis fails
+            node.is_buggy = True
+            node.analysis = f"Review analysis failed: {str(e)}"
+            
+            fallback_feedback = f"""ANALYSIS SYSTEM ERROR:
+
+The automated review system encountered an error: {str(e)}
+
+MANUAL REVIEW REQUIRED:
+- Check the execution output manually for obvious errors
+- Look for common issues like import errors, syntax errors, or missing dependencies
+- Verify that all required packages are installed
+- Test the code in smaller chunks to isolate any problems
+
+This implementation scored 0/10 due to analysis failure. Manual debugging recommended."""
+            
+            node.score = NodeScore(
+                overall_score=0.0,
+                experiment_achievement_score=0.0,
+                code_quality_score=0.0,
+                conceptual_correctness_score=0.0,
+                feedback=fallback_feedback,
+                is_satisfactory=False
+            )
+            return node
+
+        # If not buggy, proceed with detailed scoring
+        logger.info("Node execution successful, proceeding with detailed scoring")
+        
+        # Define scoring categories
+        scoring_categories = {
+            "experiment_achievement": {
+                "name": "Experiment Achievement",
+                "description": "How well the code achieves the experimental goals",
+                "criteria": [
+                    "Implements the required algorithm/method correctly",
+                    "Produces meaningful experimental results",
+                    "Evaluates using appropriate metrics",
+                    "Completes without critical errors"
+                ]
+            },
+            "code_quality": {
+                "name": "Code Quality", 
+                "description": "Technical quality and structure of the implementation",
+                "criteria": [
+                    "Clean, readable, and well-structured code",
+                    "Proper error handling and edge cases",
+                    "Efficient use of libraries and resources",
+                    "Follows best practices"
+                ]
+            },
+            "conceptual_correctness": {
+                "name": "Conceptual Correctness",
+                "description": "Correctness of the underlying approach and methodology", 
+                "criteria": [
+                    "Correct understanding of the problem",
+                    "Appropriate choice of methods/algorithms",
+                    "Sound experimental design",
+                    "Valid interpretation of results"
+                ]
+            }
+        }
+
+        # Create scoring criteria summary
+        criteria_summary = "\n".join([
+            f"**{cat['name']}** (0-10): {cat['description']}\n" + 
+            "\n".join([f"  - {criterion}" for criterion in cat['criteria']])
+            for cat in scoring_categories.values()
+        ])
+
+        scoring_prompt = {
+            "Introduction": (
+                "You are an expert Recommender System researcher conducting a paper review. "
+                "Your task is to evaluate code implementation using a structured scoring system (0-10 scale). "
+                "A score of 0 means complete failure, and 10 means excellent implementation. "
+                "Provide objective, constructive feedback."
+            ),
+            "Research Task": self.task_desc,
+            "Required Metrics": f"Must evaluate: {', '.join(self.evaluation_metrics)}",
+            "Implementation": wrap_code(node.code),
+            "Execution Output": wrap_code(node.term_out, lang=""),
+            "Scoring Categories": criteria_summary,
+            "Scoring Instructions": [
+                "Score each category from 0-10:",
+                "- 0: Complete failure or critical errors",
+                "- 1-3: Major issues preventing success",
+                "- 4-6: Partial implementation with significant problems",
+                "- 7-8: Good implementation with minor issues", 
+                "- 9-10: Excellent implementation",
+                "",
+                "Since the code executed successfully, focus on quality and correctness.",
+                "",
+                "RESPONSE FORMAT - You MUST structure your response as follows:",
+                "EXPERIMENT_ACHIEVEMENT: [score 0-10]",
+                "CODE_QUALITY: [score 0-10]", 
+                "CONCEPTUAL_CORRECTNESS: [score 0-10]",
+                "OVERALL_SCORE: [average of above three scores]",
+                "FEEDBACK: [Short feedback with specific improvement suggestions]"
+            ]
+        }
+
+        try:
+            scoring_text = query(
+                system_message=scoring_prompt,
+                user_message=None,
+                model=self.cfg.agent.feedback.model,
+                temperature=self.cfg.agent.feedback.temp
+            )
+
+            # Parse the structured response
+            scoring_result = self._parse_scoring(scoring_text)
+            
+            # Update node with scoring information
+            node.score = scoring_result
+            
+        except Exception as e:
+            logger.error(f"Error in scoring: {e}")
+            # Fallback scoring for successful but unscored code
+            node.score = NodeScore(
+                overall_score=5.0,
+                experiment_achievement_score=5.0,
+                code_quality_score=5.0,
+                conceptual_correctness_score=5.0,
+                feedback=f"Scoring failed but code executed successfully: {str(e)}",
+                is_satisfactory=False
+            )
+        
+        return node
+    
+    def _parse_scoring(self, scoring_text: str) -> NodeScore:
+        """Parse structured scoring response into components."""
+        # Initialize default values
+        overall_score = 0.0
+        experiment_achievement_score = 0.0
+        code_quality_score = 0.0
+        conceptual_correctness_score = 0.0
+        feedback = scoring_text
+        is_satisfactory = False
+        
+        try:
+            # Extract scores using regex
+            exp_match = re.search(r'EXPERIMENT_ACHIEVEMENT:\s*(\d+(?:\.\d+)?)', scoring_text, re.IGNORECASE)
+            qual_match = re.search(r'CODE_QUALITY:\s*(\d+(?:\.\d+)?)', scoring_text, re.IGNORECASE)
+            concept_match = re.search(r'CONCEPTUAL_CORRECTNESS:\s*(\d+(?:\.\d+)?)', scoring_text, re.IGNORECASE)
+            overall_match = re.search(r'OVERALL_SCORE:\s*(\d+(?:\.\d+)?)', scoring_text, re.IGNORECASE)
+            
+            # Extract feedback
+            feedback_match = re.search(r'FEEDBACK:\s*(.*?)(?=\n[A-Z_]+:|$)', scoring_text, re.DOTALL | re.IGNORECASE)
+            
+            # Parse individual scores (0-10 scale)
+            if exp_match:
+                experiment_achievement_score = min(10.0, max(0.0, float(exp_match.group(1))))
+            if qual_match:
+                code_quality_score = min(10.0, max(0.0, float(qual_match.group(1))))
+            if concept_match:
+                conceptual_correctness_score = min(10.0, max(0.0, float(concept_match.group(1))))
+            
+            # Calculate overall score as average if not provided
+            if overall_match:
+                overall_score = min(10.0, max(0.0, float(overall_match.group(1))))
+            else:
+                scores = [experiment_achievement_score, code_quality_score, conceptual_correctness_score]
+                overall_score = sum(scores) / len(scores) if scores else 0.0
+            
+            # Parse feedback
+            if feedback_match:
+                feedback = feedback_match.group(1).strip()
+            
+            # Determine if satisfactory (score >= 7.0 is considered good)
+            is_satisfactory = overall_score >= 7.5
+                
+        except Exception as e:
+            logger.warning(f"Failed to parse scoring structure: {e}")
+            # Keep default values
+            feedback = f"Failed to parse scoring: {scoring_text}"
+        
+        return NodeScore(
+            overall_score=overall_score,
+            experiment_achievement_score=experiment_achievement_score,
+            code_quality_score=code_quality_score,
+            conceptual_correctness_score=conceptual_correctness_score,
+            feedback=feedback,
+            is_satisfactory=is_satisfactory
         )
-        print(response)
 
     def _generate_plotting_code(
         self,
@@ -606,6 +871,12 @@ class MinimalAgent:
 
         return code
 
+    # def _determine_datasets_successfully_tested(self, node: Node) -> list[str]:
+    #     """Determine which datasets are successfully tested based on VLM feedback"""
+    #     plot_analyses = ""
+    #     for i, plot_analysis in enumerate(node.plot_analyses):
+    #         # FIXME: Type error:
+    #         plot_analyses += f"plot {i + 1}: {plot_analysis['analysis']}\n"
     # HACK: Comment this for now
     # def _determine_datasets_successfully_tested(self, node: Node) -> list[str]:
     #     """Determine which datasets are successfully tested based on VLM feedback"""
@@ -614,6 +885,16 @@ class MinimalAgent:
     #         # FIXME: Type error:
     #         plot_analyses += f"plot {i + 1}: {plot_analysis['analysis']}\n"
 
+    #     determine_prompt = {
+    #         "Introduction": "You are an AI researcher analyzing experiment results. Based on the plot analyses and feedback, determine which datasets are successfully tested. Return reasoning and the dataset names that are successfully executed, or an empty string if no datasets are successfully executed.",
+    #         "Plot analyses": plot_analyses,
+    #         "VLM feedback summary": node.vlm_feedback_summary,
+    #         "Original plotting code": node.plot_code,
+    #         "Response format": (
+    #             "Your response should start with 'REASONING: <reasoning>' to think about the plot analysis and feedback in the first line."
+    #             "In the second line, you should have a list of dataset names that are successfully executed, starting with 'SUCCESSFULLY_TESTED_DATASETS: <list_datasets_successfully_tested>', "
+    #         ),
+    #     }
     #     determine_prompt = {
     #         "Introduction": "You are an AI researcher analyzing experiment results. Based on the plot analyses and feedback, determine which datasets are successfully tested. Return reasoning and the dataset names that are successfully executed, or an empty string if no datasets are successfully executed.",
     #         "Plot analyses": plot_analyses,
@@ -634,7 +915,37 @@ class MinimalAgent:
     #             model=self.cfg.agent.feedback.model,
     #             temperature=self.cfg.agent.feedback.temp,
     #         )
+    #     retry_count = 0
+    #     retry_limit = 5
+    #     while retry_count < retry_limit:
+    #         response = query(
+    #             system_message=determine_prompt,
+    #             user_message=None,
+    #             model=self.cfg.agent.feedback.model,
+    #             temperature=self.cfg.agent.feedback.temp,
+    #         )
 
+    #         (
+    #             reasoning,
+    #             datasets_successfully_tested_str,
+    #         ) = self._parse_keyword_prefix_response(
+    #             response, "REASONING:", "SUCCESSFULLY_TESTED_DATASETS:"
+    #         )
+    #         print(f"[green]Reasoning:[/green] {reasoning}")
+    #         print(
+    #             f"[green]Datasets successfully tested:[/green] {datasets_successfully_tested_str}"
+    #         )
+    #         if reasoning is not None and datasets_successfully_tested_str is not None:
+    #             if datasets_successfully_tested_str == "":
+    #                 return [""]
+    #             # Split by comma and clean each dataset name
+    #             datasets = [
+    #                 ds.strip() for ds in datasets_successfully_tested_str.split(",")
+    #             ]
+    #             # Filter out empty strings and ensure all elements are strings
+    #             datasets = [ds for ds in datasets if isinstance(ds, str) and ds]
+    #             logger.info(f"Successfully parsed datasets: {datasets}")
+    #             return datasets
     #         (
     #             reasoning,
     #             datasets_successfully_tested_str,
@@ -661,18 +972,32 @@ class MinimalAgent:
     #         logger.warning(
     #             f"Failed to parse successfully tested datasets response (attempt {retry_count}/{retry_limit})"
     #         )
+    #         retry_count += 1
+    #         logger.warning(
+    #             f"Failed to parse successfully tested datasets response (attempt {retry_count}/{retry_limit})"
+    #         )
 
     #     logger.error(
     #         f"Failed to parse successfully tested datasets response after {retry_limit} retries. Falling back to an empty list."
     #     )
     #     return [""]
+    #     logger.error(
+    #         f"Failed to parse successfully tested datasets response after {retry_limit} retries. Falling back to an empty list."
+    #     )
+    #     return [""]
 
+    # def _analyze_plots_with_vlm(self, node: Node) -> None:
+    #     """Analyze experimental plots using VLM"""
+    #     if not node.plot_paths:
+    #         return
     # HACK: Comment this for now
     # def _analyze_plots_with_vlm(self, node: Node) -> None:
     #     """Analyze experimental plots using VLM"""
     #     if not node.plot_paths:
     #         return
 
+    #     # for debugging
+    #     print(f"[cyan]Plot paths:[/cyan] {node.plot_paths}")
     #     # for debugging
     #     print(f"[cyan]Plot paths:[/cyan] {node.plot_paths}")
 
@@ -683,7 +1008,31 @@ class MinimalAgent:
     #             except Exception as e:
     #                 print(f"[red]Error encoding image {image_path}: {e}[/red]")
     #                 return None
+    #     def encode_image_to_base64(image_path):
+    #         with open(image_path, "rb") as image_file:
+    #             try:
+    #                 return base64.b64encode(image_file.read()).decode("utf-8")
+    #             except Exception as e:
+    #                 print(f"[red]Error encoding image {image_path}: {e}[/red]")
+    #                 return None
 
+    #     if not len(node.plot_paths) > 10:
+    #         selected_plots = node.plot_paths
+    #     else:
+    #         print(
+    #             f"[red]Warning: {len(node.plot_paths)} plots received, this may be too many to analyze effectively. Calling LLM to select the most relevant plots to analyze.[/red]"
+    #         )
+    #         # select 10 plots to analyze
+    #         prompt_select_plots = {
+    #             "Introduction": (
+    #                 "You are an experienced AI researcher analyzing experimental results. "
+    #                 "You have been provided with plots from a machine learning experiment. "
+    #                 "Please select 10 most relevant plots to analyze. "
+    #                 "For similar plots (e.g. generated samples at each epoch), select only at most 5 plots at a suitable interval of epochs."
+    #                 "Format your response as a list of plot paths, where each plot path includes the full path to the plot file."
+    #             ),
+    #             "Plot paths": node.plot_paths,
+    #         }
     #     if not len(node.plot_paths) > 10:
     #         selected_plots = node.plot_paths
     #     else:
@@ -713,11 +1062,36 @@ class MinimalAgent:
     #                     temperature=self.cfg.agent.feedback.temp,
     #                 ),
     #             )
+    #         try:
+    #             response_select_plots = cast(
+    #                 dict,
+    #                 query(
+    #                     system_message=prompt_select_plots,
+    #                     user_message=None,
+    #                     func_spec=plot_selection_spec,
+    #                     model=self.cfg.agent.feedback.model,
+    #                     temperature=self.cfg.agent.feedback.temp,
+    #                 ),
+    #             )
 
     #             print(f"[cyan]Plot selection response:[/cyan] {response_select_plots}")
     #             # Extract the plot paths list
     #             selected_plots = response_select_plots.get("selected_plots", [])
+    #             print(f"[cyan]Plot selection response:[/cyan] {response_select_plots}")
+    #             # Extract the plot paths list
+    #             selected_plots = response_select_plots.get("selected_plots", [])
 
+    #             # Validate that all paths exist and are image files
+    #             valid_plots = []
+    #             for plot_path in selected_plots:
+    #                 if (
+    #                     isinstance(plot_path, str)
+    #                     and os.path.exists(plot_path)
+    #                     and plot_path.lower().endswith((".png", ".jpg", ".jpeg"))
+    #                 ):
+    #                     valid_plots.append(plot_path)
+    #                 else:
+    #                     logger.warning(f"Invalid plot path received: {plot_path}")
     #             # Validate that all paths exist and are image files
     #             valid_plots = []
     #             for plot_path in selected_plots:
@@ -748,6 +1122,24 @@ class MinimalAgent:
     #                         selected_plots.append(plot_path)
     #                     else:
     #                         logger.warning(f"Invalid plot path received: {plot_path}")
+    #             # Use the validated list
+    #             if valid_plots:
+    #                 print(f"[cyan]Selected valid plots:[/cyan] {valid_plots}")
+    #                 selected_plots = valid_plots
+    #             else:
+    #                 logger.warning(
+    #                     "No valid plot paths found in response, falling back to first 10 plots"
+    #                 )
+    #                 # fallback to first 10 plots
+    #                 # validate node.plot_paths
+    #                 selected_plots = []
+    #                 for plot_path in node.plot_paths[:10]:
+    #                     if os.path.exists(plot_path) and plot_path.lower().endswith(
+    #                         (".png", ".jpg", ".jpeg")
+    #                     ):
+    #                         selected_plots.append(plot_path)
+    #                     else:
+    #                         logger.warning(f"Invalid plot path received: {plot_path}")
 
     #         except Exception as e:
     #             logger.error(
@@ -755,7 +1147,37 @@ class MinimalAgent:
     #             )
     #             # Fallback to using first 10 plots
     #             selected_plots = node.plot_paths[:10]
+    #         except Exception as e:
+    #             logger.error(
+    #                 f"Error in plot selection: {str(e)}; falling back to first 10 plots"
+    #             )
+    #             # Fallback to using first 10 plots
+    #             selected_plots = node.plot_paths[:10]
 
+    #     print("[cyan]Before encoding images[/cyan]")
+    #     user_message = [
+    #         {
+    #             "type": "text",
+    #             "text": (
+    #                 "You are an experienced AI researcher analyzing experimental results. "
+    #                 "You have been provided with plots from a machine learning experiment. "
+    #                 f"This experiment is based on the following research idea: {self.task_desc}"
+    #                 "Please analyze these plots and provide detailed insights about the results. "
+    #                 "If you don't receive any plots, say 'No plots received'. "
+    #                 "Never make up plot analysis. "
+    #                 "Please return the analyzes with strict order of uploaded images, but DO NOT include any word "
+    #                 "like 'the first plot'."
+    #             ),
+    #         }
+    #     ] + [
+    #         {
+    #             "type": "image_url",
+    #             "image_url": {
+    #                 "url": f"data:image/jpeg;base64,{encode_image_to_base64(plot_path)}"
+    #             },
+    #         }
+    #         for plot_path in selected_plots
+    #     ]
     #     print("[cyan]Before encoding images[/cyan]")
     #     user_message = [
     #         {
@@ -798,69 +1220,93 @@ class MinimalAgent:
     #         node.is_buggy_plots = False
     #     else:
     #         node.is_buggy_plots = True
+    #     response = cast(
+    #         dict,
+    #         query(
+    #             system_message=None,
+    #             user_message=user_message,
+    #             func_spec=vlm_feedback_spec,
+    #             model=self.cfg.agent.vlm_feedback.model,
+    #             temperature=self.cfg.agent.vlm_feedback.temp,
+    #         ),
+    #     )
+    #     print(
+    #         f"[cyan]VLM response from {self.cfg.agent.vlm_feedback.model}:[/cyan] {response}"
+    #     )
+    #     if response["valid_plots_received"]:
+    #         node.is_buggy_plots = False
+    #     else:
+    #         node.is_buggy_plots = True
 
     #     for index, analysis in enumerate(response["plot_analyses"]):
     #         analysis["plot_path"] = node.plot_paths[index]
+    #     for index, analysis in enumerate(response["plot_analyses"]):
+    #         analysis["plot_path"] = node.plot_paths[index]
 
+    #     node.plot_analyses = response["plot_analyses"]
+    #     node.vlm_feedback_summary = response["vlm_feedback_summary"]
     #     node.plot_analyses = response["plot_analyses"]
     #     node.vlm_feedback_summary = response["vlm_feedback_summary"]
 
     #     node.datasets_successfully_tested = (
     #         self._determine_datasets_successfully_tested(node)
     #     )
+    #     node.datasets_successfully_tested = (
+    #         self._determine_datasets_successfully_tested(node)
+    #     )
 
-    def _generate_node_summary(self, node: Node) -> dict:
-        """Generate a summary of the node's experimental findings"""
-        summary_prompt = {
-            "Introduction": (
-                "You are an AI researcher analyzing experimental results. "
-                "Please summarize the findings from this experiment iteration."
-            ),
-            "Research idea": self.task_desc,
-            "Implementation": wrap_code(node.code),
-            "Plan": node.plan,
-            "Execution output": wrap_code(node.term_out, lang=""),
-            "Analysis": node.analysis,
-            "Metric": str(node.metric) if node.metric else "Failed",
-            "Plot Analyses": (
-                node.plot_analyses if hasattr(node, "plot_analyses") else []
-            ),
-            "VLM Feedback": (
-                node.vlm_feedback_summary
-                if hasattr(node, "vlm_feedback_summary")
-                else ""
-            ),
-        }
+    # def _generate_node_summary(self, node: Node) -> dict:
+    #     """Generate a summary of the node's experimental findings"""
+    #     summary_prompt = {
+    #         "Introduction": (
+    #             "You are a recommender system researcher analyzing experimental results. "
+    #             "Please summarize the findings from this experiment iteration."
+    #         ),
+    #         "Research idea": self.task_desc,
+    #         "Implementation": wrap_code(node.code),
+    #         "Plan": node.plan,
+    #         "Execution output": wrap_code(node.term_out, lang=""),
+    #         "Analysis": node.analysis,
+    #         "Metric": str(node.metric) if node.metric else "Failed",
+    #         "Plot Analyses": (
+    #             node.plot_analyses if hasattr(node, "plot_analyses") else []
+    #         ),
+    #         "VLM Feedback": (
+    #             node.vlm_feedback_summary
+    #             if hasattr(node, "vlm_feedback_summary")
+    #             else ""
+    #         ),
+    #     }
 
-        return cast(
-            dict,
-            query(
-                system_message=summary_prompt,
-                user_message=None,
-                # FIXME: Type error
-                func_spec={
-                    "name": "summarize_experiment",
-                    "description": "Summarize experimental findings",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "findings": {
-                                "type": "string",
-                                "description": "Key findings and results",
-                            },
-                            "significance": {
-                                "type": "string",
-                                "description": "Why these results matter",
-                            },
-                            "next_steps": {
-                                "type": "string",
-                                "description": "Suggested improvements or next experiments",
-                            },
-                        },
-                        "required": ["findings", "significance"],
-                    },
-                },
-                model=self.cfg.agent.feedback.model,
-                temperature=self.cfg.agent.feedback.temp,
-            ),
-        )
+    #     return cast(
+    #         dict,
+    #         query(
+    #             system_message=summary_prompt,
+    #             user_message=None,
+    #             # FIXME: Type error
+    #             func_spec={
+    #                 "name": "summarize_experiment",
+    #                 "description": "Summarize experimental findings",
+    #                 "parameters": {
+    #                     "type": "object",
+    #                     "properties": {
+    #                         "findings": {
+    #                             "type": "string",
+    #                             "description": "Key findings and results",
+    #                         },
+    #                         "significance": {
+    #                             "type": "string",
+    #                             "description": "Why these results matter",
+    #                         },
+    #                         "next_steps": {
+    #                             "type": "string",
+    #                             "description": "Suggested improvements or next experiments",
+    #                         },
+    #                     },
+    #                     "required": ["findings", "significance"],
+    #                 },
+    #             },
+    #             model=self.cfg.agent.feedback.model,
+    #             temperature=self.cfg.agent.feedback.temp,
+    #         ),
+    #     )
