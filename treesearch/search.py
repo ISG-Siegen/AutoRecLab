@@ -62,14 +62,14 @@ class TreeSearch:
         # Step 1: Generate draft nodes:
         for i in range(self._config.treesearch.num_draft_nodes):
             logger.info(
-                f"Generating draft node {i}/{self._config.treesearch.num_draft_nodes}"
+                f"Generating draft node {i+1}/{self._config.treesearch.num_draft_nodes}"
             )
             draft_node = self._minimal_agent._draft()
             self.exec_node(draft_node)
 
         for i in range(self._config.treesearch.max_iterations):
             logger.info(
-                f"Treesearch iteration {i}/{self._config.treesearch.max_iterations}"
+                f"Treesearch iteration {i+1}/{self._config.treesearch.max_iterations}"
             )
             parent_node = self.select_next_node()
 
