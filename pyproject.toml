@@ -19,6 +19,7 @@ dependencies = [
     "openai>=1.108.1",
     "pydantic-settings>=2.10.1",
     "rich>=14.1.0",
+    "scikit-learn==1.7.1",
     "shutup>=0.2.0",
     "tomli-w>=1.2.0",
 ]
