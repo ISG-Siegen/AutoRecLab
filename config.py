@@ -13,6 +13,7 @@ class TreeSearchConfig(BaseSettings):
 
 class ExecConfig(BaseSettings):
     timeout: int = 3600
+    workspace: str = "./workspace"
 
 
 class CodeConfig(BaseSettings):
