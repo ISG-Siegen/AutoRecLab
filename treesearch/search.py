@@ -1,6 +1,8 @@
+import pickle
 import random
 from pathlib import Path
 
+from anytree import PreOrderIter
 from marshmallow import pre_dump
 
 from config import Config
@@ -28,11 +30,7 @@ class TreeSearch:
 
     @property
     def all_nodes(self):
-        all_nodes = self._draft_nodes
-        for draft_node in self._draft_nodes:
-            all_nodes.extend(draft_node.descendants)
-
-        return all_nodes
+        return [n for root in self._draft_nodes for n in PreOrderIter(root)]
 
     @property
     def good_nodes(self):
@@ -49,7 +47,11 @@ class TreeSearch:
         return good_nodes[0]
 
     def select_next_node(self) -> Node:
-        if random.random() < self._config.treesearch.debug_prob:
+        if (
+            len(self.buggy_nodes) > 0
+            and random.random() < self._config.treesearch.debug_prob
+            or len(self.good_nodes) == 0
+        ):
             return random.choice(self.buggy_nodes)
 
         # Epsilon-greedy explore vs. exploit:
@@ -62,14 +64,15 @@ class TreeSearch:
         # Step 1: Generate draft nodes:
         for i in range(self._config.treesearch.num_draft_nodes):
             logger.info(
-                f"Generating draft node {i+1}/{self._config.treesearch.num_draft_nodes}"
+                f"Generating draft node {i + 1}/{self._config.treesearch.num_draft_nodes}"
             )
             draft_node = self._minimal_agent._draft()
             self.exec_node(draft_node)
+            self._draft_nodes.append(draft_node)
 
         for i in range(self._config.treesearch.max_iterations):
             logger.info(
-                f"Treesearch iteration {i+1}/{self._config.treesearch.max_iterations}"
+                f"Treesearch iteration {i + 1}/{self._config.treesearch.max_iterations}"
             )
             parent_node = self.select_next_node()
 
@@ -85,7 +88,10 @@ class TreeSearch:
                 # HACK:
                 print(child_node.term_out)
                 print(child_node.code)
+                self.save()
                 return
+
+        self.save()
 
         logger.warning("Found no satisfactory node; Using best node instead...")
 
@@ -96,6 +102,7 @@ class TreeSearch:
 
     def exec_node(self, node: Node) -> Node:
         exec_result = self._interpreter.run(node.code)
+        print(exec_result)
         self._minimal_agent.score_code(node, exec_result)
         return node
 
@@ -108,3 +115,8 @@ The idea is:\n
 """
         task_desc += self._user_request
         return task_desc
+
+    def save(self):
+        with open("./save.pkl", "wb") as f:
+            logger.warning(f"SAVING {len(self._draft_nodes)}.....")
+            pickle.dump(self._draft_nodes, f)
