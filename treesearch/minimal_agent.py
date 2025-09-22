@@ -4,7 +4,6 @@ import random
 from typing import Any, Optional, cast
 
 import humanize
-from utils.response import wrap_code
 
 from config import Config
 from treesearch.backend.llm import query
@@ -16,6 +15,7 @@ from treesearch.function_specs import (
 )
 from treesearch.interpreter import ExecutionResult
 from treesearch.node import Node
+from treesearch.utils.response import wrap_code
 from utils.log import _ROOT_LOGGER
 
 logger = _ROOT_LOGGER.getChild("nodeAgent")
