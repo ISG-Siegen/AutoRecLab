@@ -1,0 +1,13 @@
+[treesearch]
+num_draft_nodes = 3
+
+[exec]
+timeout = 3600
+
+[agent]
+k_fold_validation = 1
+data_preview = false
+
+[agent.code]
+model = "gpt-4o"
+model_temp = 1.0

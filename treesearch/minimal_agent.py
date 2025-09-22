@@ -6,6 +6,7 @@ from typing import Any, Optional, cast
 import humanize
 from utils.response import wrap_code
 
+from config import Config
 from treesearch.backend.llm import query
 from treesearch.backend.utils import extract_code, extract_text_up_to_code
 from treesearch.function_specs import (
@@ -41,8 +42,8 @@ class MinimalAgent:
 
     def __init__(
         self,
-        task_desc,
-        cfg,
+        task_desc: str,
+        cfg: Config,
         memory_summary=None,
         evaluation_metrics=None,
         stage=None,
@@ -81,18 +82,19 @@ class MinimalAgent:
             "  - Always pay extra attention to the input to the model being properly normalized",
             "  - This is extremely important because the input to the model's forward pass directly affects the output, and the loss function is computed based on the output",
         ]
-        if hasattr(self.cfg.experiment, "num_syn_datasets"):
-            num_syn_datasets = self.cfg.experiment.num_syn_datasets
-            if num_syn_datasets > 1:
-                impl_guideline.extend(
-                    [
-                        f"You MUST evaluate your solution on at least {num_syn_datasets} different synthetic datasets to ensure robustness:",
-                        "  - Use standard benchmark datasets when available",
-                        f"  - If using synthetic data, generate at least {num_syn_datasets} variants with different characteristics",
-                        "  - Report metrics separately for each dataset",
-                        "  - Compute and report the average metric across all datasets",
-                    ]
-                )
+        # HACK: Remove this for now
+        # if hasattr(self.cfg.experiment, "num_syn_datasets"):
+        #     num_syn_datasets = self.cfg.experiment.num_syn_datasets
+        #     if num_syn_datasets > 1:
+        #         impl_guideline.extend(
+        #             [
+        #                 f"You MUST evaluate your solution on at least {num_syn_datasets} different synthetic datasets to ensure robustness:",
+        #                 "  - Use standard benchmark datasets when available",
+        #                 f"  - If using synthetic data, generate at least {num_syn_datasets} variants with different characteristics",
+        #                 "  - Report metrics separately for each dataset",
+        #                 "  - Compute and report the average metric across all datasets",
+        #             ]
+        #         )
         impl_guideline.extend(
             [
                 "For generative modeling tasks, you must:",
@@ -432,7 +434,7 @@ class MinimalAgent:
                 system_message=prompt,
                 user_message=None,
                 model=self.cfg.agent.code.model,
-                temperature=self.cfg.agent.code.temp,
+                temperature=self.cfg.agent.code.model_temp,
             )
 
             code = extract_code(completion_text)
@@ -604,206 +606,208 @@ class MinimalAgent:
 
         return code
 
-    def _determine_datasets_successfully_tested(self, node: Node) -> list[str]:
-        """Determine which datasets are successfully tested based on VLM feedback"""
-        plot_analyses = ""
-        for i, plot_analysis in enumerate(node.plot_analyses):
-            # FIXME: Type error:
-            plot_analyses += f"plot {i + 1}: {plot_analysis['analysis']}\n"
+    # HACK: Comment this for now
+    # def _determine_datasets_successfully_tested(self, node: Node) -> list[str]:
+    #     """Determine which datasets are successfully tested based on VLM feedback"""
+    #     plot_analyses = ""
+    #     for i, plot_analysis in enumerate(node.plot_analyses):
+    #         # FIXME: Type error:
+    #         plot_analyses += f"plot {i + 1}: {plot_analysis['analysis']}\n"
 
-        determine_prompt = {
-            "Introduction": "You are an AI researcher analyzing experiment results. Based on the plot analyses and feedback, determine which datasets are successfully tested. Return reasoning and the dataset names that are successfully executed, or an empty string if no datasets are successfully executed.",
-            "Plot analyses": plot_analyses,
-            "VLM feedback summary": node.vlm_feedback_summary,
-            "Original plotting code": node.plot_code,
-            "Response format": (
-                "Your response should start with 'REASONING: <reasoning>' to think about the plot analysis and feedback in the first line."
-                "In the second line, you should have a list of dataset names that are successfully executed, starting with 'SUCCESSFULLY_TESTED_DATASETS: <list_datasets_successfully_tested>', "
-            ),
-        }
+    #     determine_prompt = {
+    #         "Introduction": "You are an AI researcher analyzing experiment results. Based on the plot analyses and feedback, determine which datasets are successfully tested. Return reasoning and the dataset names that are successfully executed, or an empty string if no datasets are successfully executed.",
+    #         "Plot analyses": plot_analyses,
+    #         "VLM feedback summary": node.vlm_feedback_summary,
+    #         "Original plotting code": node.plot_code,
+    #         "Response format": (
+    #             "Your response should start with 'REASONING: <reasoning>' to think about the plot analysis and feedback in the first line."
+    #             "In the second line, you should have a list of dataset names that are successfully executed, starting with 'SUCCESSFULLY_TESTED_DATASETS: <list_datasets_successfully_tested>', "
+    #         ),
+    #     }
 
-        retry_count = 0
-        retry_limit = 5
-        while retry_count < retry_limit:
-            response = query(
-                system_message=determine_prompt,
-                user_message=None,
-                model=self.cfg.agent.feedback.model,
-                temperature=self.cfg.agent.feedback.temp,
-            )
+    #     retry_count = 0
+    #     retry_limit = 5
+    #     while retry_count < retry_limit:
+    #         response = query(
+    #             system_message=determine_prompt,
+    #             user_message=None,
+    #             model=self.cfg.agent.feedback.model,
+    #             temperature=self.cfg.agent.feedback.temp,
+    #         )
 
-            (
-                reasoning,
-                datasets_successfully_tested_str,
-            ) = _parse_keyword_prefix_response(
-                response, "REASONING:", "SUCCESSFULLY_TESTED_DATASETS:"
-            )
-            print(f"[green]Reasoning:[/green] {reasoning}")
-            print(
-                f"[green]Datasets successfully tested:[/green] {datasets_successfully_tested_str}"
-            )
-            if reasoning is not None and datasets_successfully_tested_str is not None:
-                if datasets_successfully_tested_str == "":
-                    return [""]
-                # Split by comma and clean each dataset name
-                datasets = [
-                    ds.strip() for ds in datasets_successfully_tested_str.split(",")
-                ]
-                # Filter out empty strings and ensure all elements are strings
-                datasets = [ds for ds in datasets if isinstance(ds, str) and ds]
-                logger.info(f"Successfully parsed datasets: {datasets}")
-                return datasets
+    #         (
+    #             reasoning,
+    #             datasets_successfully_tested_str,
+    #         ) = _parse_keyword_prefix_response(
+    #             response, "REASONING:", "SUCCESSFULLY_TESTED_DATASETS:"
+    #         )
+    #         print(f"[green]Reasoning:[/green] {reasoning}")
+    #         print(
+    #             f"[green]Datasets successfully tested:[/green] {datasets_successfully_tested_str}"
+    #         )
+    #         if reasoning is not None and datasets_successfully_tested_str is not None:
+    #             if datasets_successfully_tested_str == "":
+    #                 return [""]
+    #             # Split by comma and clean each dataset name
+    #             datasets = [
+    #                 ds.strip() for ds in datasets_successfully_tested_str.split(",")
+    #             ]
+    #             # Filter out empty strings and ensure all elements are strings
+    #             datasets = [ds for ds in datasets if isinstance(ds, str) and ds]
+    #             logger.info(f"Successfully parsed datasets: {datasets}")
+    #             return datasets
 
-            retry_count += 1
-            logger.warning(
-                f"Failed to parse successfully tested datasets response (attempt {retry_count}/{retry_limit})"
-            )
+    #         retry_count += 1
+    #         logger.warning(
+    #             f"Failed to parse successfully tested datasets response (attempt {retry_count}/{retry_limit})"
+    #         )
 
-        logger.error(
-            f"Failed to parse successfully tested datasets response after {retry_limit} retries. Falling back to an empty list."
-        )
-        return [""]
+    #     logger.error(
+    #         f"Failed to parse successfully tested datasets response after {retry_limit} retries. Falling back to an empty list."
+    #     )
+    #     return [""]
 
-    def _analyze_plots_with_vlm(self, node: Node) -> None:
-        """Analyze experimental plots using VLM"""
-        if not node.plot_paths:
-            return
+    # HACK: Comment this for now
+    # def _analyze_plots_with_vlm(self, node: Node) -> None:
+    #     """Analyze experimental plots using VLM"""
+    #     if not node.plot_paths:
+    #         return
 
-        # for debugging
-        print(f"[cyan]Plot paths:[/cyan] {node.plot_paths}")
+    #     # for debugging
+    #     print(f"[cyan]Plot paths:[/cyan] {node.plot_paths}")
 
-        def encode_image_to_base64(image_path):
-            with open(image_path, "rb") as image_file:
-                try:
-                    return base64.b64encode(image_file.read()).decode("utf-8")
-                except Exception as e:
-                    print(f"[red]Error encoding image {image_path}: {e}[/red]")
-                    return None
+    #     def encode_image_to_base64(image_path):
+    #         with open(image_path, "rb") as image_file:
+    #             try:
+    #                 return base64.b64encode(image_file.read()).decode("utf-8")
+    #             except Exception as e:
+    #                 print(f"[red]Error encoding image {image_path}: {e}[/red]")
+    #                 return None
 
-        if not len(node.plot_paths) > 10:
-            selected_plots = node.plot_paths
-        else:
-            print(
-                f"[red]Warning: {len(node.plot_paths)} plots received, this may be too many to analyze effectively. Calling LLM to select the most relevant plots to analyze.[/red]"
-            )
-            # select 10 plots to analyze
-            prompt_select_plots = {
-                "Introduction": (
-                    "You are an experienced AI researcher analyzing experimental results. "
-                    "You have been provided with plots from a machine learning experiment. "
-                    "Please select 10 most relevant plots to analyze. "
-                    "For similar plots (e.g. generated samples at each epoch), select only at most 5 plots at a suitable interval of epochs."
-                    "Format your response as a list of plot paths, where each plot path includes the full path to the plot file."
-                ),
-                "Plot paths": node.plot_paths,
-            }
+    #     if not len(node.plot_paths) > 10:
+    #         selected_plots = node.plot_paths
+    #     else:
+    #         print(
+    #             f"[red]Warning: {len(node.plot_paths)} plots received, this may be too many to analyze effectively. Calling LLM to select the most relevant plots to analyze.[/red]"
+    #         )
+    #         # select 10 plots to analyze
+    #         prompt_select_plots = {
+    #             "Introduction": (
+    #                 "You are an experienced AI researcher analyzing experimental results. "
+    #                 "You have been provided with plots from a machine learning experiment. "
+    #                 "Please select 10 most relevant plots to analyze. "
+    #                 "For similar plots (e.g. generated samples at each epoch), select only at most 5 plots at a suitable interval of epochs."
+    #                 "Format your response as a list of plot paths, where each plot path includes the full path to the plot file."
+    #             ),
+    #             "Plot paths": node.plot_paths,
+    #         }
 
-            try:
-                response_select_plots = cast(
-                    dict,
-                    query(
-                        system_message=prompt_select_plots,
-                        user_message=None,
-                        func_spec=plot_selection_spec,
-                        model=self.cfg.agent.feedback.model,
-                        temperature=self.cfg.agent.feedback.temp,
-                    ),
-                )
+    #         try:
+    #             response_select_plots = cast(
+    #                 dict,
+    #                 query(
+    #                     system_message=prompt_select_plots,
+    #                     user_message=None,
+    #                     func_spec=plot_selection_spec,
+    #                     model=self.cfg.agent.feedback.model,
+    #                     temperature=self.cfg.agent.feedback.temp,
+    #                 ),
+    #             )
 
-                print(f"[cyan]Plot selection response:[/cyan] {response_select_plots}")
-                # Extract the plot paths list
-                selected_plots = response_select_plots.get("selected_plots", [])
+    #             print(f"[cyan]Plot selection response:[/cyan] {response_select_plots}")
+    #             # Extract the plot paths list
+    #             selected_plots = response_select_plots.get("selected_plots", [])
 
-                # Validate that all paths exist and are image files
-                valid_plots = []
-                for plot_path in selected_plots:
-                    if (
-                        isinstance(plot_path, str)
-                        and os.path.exists(plot_path)
-                        and plot_path.lower().endswith((".png", ".jpg", ".jpeg"))
-                    ):
-                        valid_plots.append(plot_path)
-                    else:
-                        logger.warning(f"Invalid plot path received: {plot_path}")
+    #             # Validate that all paths exist and are image files
+    #             valid_plots = []
+    #             for plot_path in selected_plots:
+    #                 if (
+    #                     isinstance(plot_path, str)
+    #                     and os.path.exists(plot_path)
+    #                     and plot_path.lower().endswith((".png", ".jpg", ".jpeg"))
+    #                 ):
+    #                     valid_plots.append(plot_path)
+    #                 else:
+    #                     logger.warning(f"Invalid plot path received: {plot_path}")
 
-                # Use the validated list
-                if valid_plots:
-                    print(f"[cyan]Selected valid plots:[/cyan] {valid_plots}")
-                    selected_plots = valid_plots
-                else:
-                    logger.warning(
-                        "No valid plot paths found in response, falling back to first 10 plots"
-                    )
-                    # fallback to first 10 plots
-                    # validate node.plot_paths
-                    selected_plots = []
-                    for plot_path in node.plot_paths[:10]:
-                        if os.path.exists(plot_path) and plot_path.lower().endswith(
-                            (".png", ".jpg", ".jpeg")
-                        ):
-                            selected_plots.append(plot_path)
-                        else:
-                            logger.warning(f"Invalid plot path received: {plot_path}")
+    #             # Use the validated list
+    #             if valid_plots:
+    #                 print(f"[cyan]Selected valid plots:[/cyan] {valid_plots}")
+    #                 selected_plots = valid_plots
+    #             else:
+    #                 logger.warning(
+    #                     "No valid plot paths found in response, falling back to first 10 plots"
+    #                 )
+    #                 # fallback to first 10 plots
+    #                 # validate node.plot_paths
+    #                 selected_plots = []
+    #                 for plot_path in node.plot_paths[:10]:
+    #                     if os.path.exists(plot_path) and plot_path.lower().endswith(
+    #                         (".png", ".jpg", ".jpeg")
+    #                     ):
+    #                         selected_plots.append(plot_path)
+    #                     else:
+    #                         logger.warning(f"Invalid plot path received: {plot_path}")
 
-            except Exception as e:
-                logger.error(
-                    f"Error in plot selection: {str(e)}; falling back to first 10 plots"
-                )
-                # Fallback to using first 10 plots
-                selected_plots = node.plot_paths[:10]
+    #         except Exception as e:
+    #             logger.error(
+    #                 f"Error in plot selection: {str(e)}; falling back to first 10 plots"
+    #             )
+    #             # Fallback to using first 10 plots
+    #             selected_plots = node.plot_paths[:10]
 
-        print("[cyan]Before encoding images[/cyan]")
-        user_message = [
-            {
-                "type": "text",
-                "text": (
-                    "You are an experienced AI researcher analyzing experimental results. "
-                    "You have been provided with plots from a machine learning experiment. "
-                    f"This experiment is based on the following research idea: {self.task_desc}"
-                    "Please analyze these plots and provide detailed insights about the results. "
-                    "If you don't receive any plots, say 'No plots received'. "
-                    "Never make up plot analysis. "
-                    "Please return the analyzes with strict order of uploaded images, but DO NOT include any word "
-                    "like 'the first plot'."
-                ),
-            }
-        ] + [
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{encode_image_to_base64(plot_path)}"
-                },
-            }
-            for plot_path in selected_plots
-        ]
+    #     print("[cyan]Before encoding images[/cyan]")
+    #     user_message = [
+    #         {
+    #             "type": "text",
+    #             "text": (
+    #                 "You are an experienced AI researcher analyzing experimental results. "
+    #                 "You have been provided with plots from a machine learning experiment. "
+    #                 f"This experiment is based on the following research idea: {self.task_desc}"
+    #                 "Please analyze these plots and provide detailed insights about the results. "
+    #                 "If you don't receive any plots, say 'No plots received'. "
+    #                 "Never make up plot analysis. "
+    #                 "Please return the analyzes with strict order of uploaded images, but DO NOT include any word "
+    #                 "like 'the first plot'."
+    #             ),
+    #         }
+    #     ] + [
+    #         {
+    #             "type": "image_url",
+    #             "image_url": {
+    #                 "url": f"data:image/jpeg;base64,{encode_image_to_base64(plot_path)}"
+    #             },
+    #         }
+    #         for plot_path in selected_plots
+    #     ]
 
-        response = cast(
-            dict,
-            query(
-                system_message=None,
-                user_message=user_message,
-                func_spec=vlm_feedback_spec,
-                model=self.cfg.agent.vlm_feedback.model,
-                temperature=self.cfg.agent.vlm_feedback.temp,
-            ),
-        )
-        print(
-            f"[cyan]VLM response from {self.cfg.agent.vlm_feedback.model}:[/cyan] {response}"
-        )
-        if response["valid_plots_received"]:
-            node.is_buggy_plots = False
-        else:
-            node.is_buggy_plots = True
+    #     response = cast(
+    #         dict,
+    #         query(
+    #             system_message=None,
+    #             user_message=user_message,
+    #             func_spec=vlm_feedback_spec,
+    #             model=self.cfg.agent.vlm_feedback.model,
+    #             temperature=self.cfg.agent.vlm_feedback.temp,
+    #         ),
+    #     )
+    #     print(
+    #         f"[cyan]VLM response from {self.cfg.agent.vlm_feedback.model}:[/cyan] {response}"
+    #     )
+    #     if response["valid_plots_received"]:
+    #         node.is_buggy_plots = False
+    #     else:
+    #         node.is_buggy_plots = True
 
-        for index, analysis in enumerate(response["plot_analyses"]):
-            analysis["plot_path"] = node.plot_paths[index]
+    #     for index, analysis in enumerate(response["plot_analyses"]):
+    #         analysis["plot_path"] = node.plot_paths[index]
 
-        node.plot_analyses = response["plot_analyses"]
-        node.vlm_feedback_summary = response["vlm_feedback_summary"]
+    #     node.plot_analyses = response["plot_analyses"]
+    #     node.vlm_feedback_summary = response["vlm_feedback_summary"]
 
-        node.datasets_successfully_tested = (
-            self._determine_datasets_successfully_tested(node)
-        )
+    #     node.datasets_successfully_tested = (
+    #         self._determine_datasets_successfully_tested(node)
+    #     )
 
     def _generate_node_summary(self, node: Node) -> dict:
         """Generate a summary of the node's experimental findings"""
