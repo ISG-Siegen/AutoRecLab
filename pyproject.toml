@@ -5,13 +5,17 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "anthropic>=0.68.0",
     "anytree>=2.13.0",
+    "backoff>=2.2.1",
     "black>=25.9.0",
     "dataclasses-json>=0.6.7",
+    "funcy>=2.0",
     "graphviz>=0.21",
     "humanize>=4.13.0",
     "jsonschema>=4.25.1",
     "numpy>=2.3.3",
+    "openai>=1.108.1",
     "pydantic-settings>=2.10.1",
     "rich>=14.1.0",
     "tomli-w>=1.2.0",
