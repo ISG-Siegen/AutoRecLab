@@ -13,10 +13,7 @@ from treesearch.utils.response import trim_long_string
 
 @dataclass
 class NodeScore:
-    overall_score: float = 0.0
-    experiment_achievement_score: float = 0.0
-    code_quality_score: float = 0.0
-    conceptual_correctness_score: float = 0.0
+    score: float = 0.0
     feedback: str = ""
     is_satisfactory: bool = False
 

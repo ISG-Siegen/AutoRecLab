@@ -9,10 +9,9 @@ CONFIG_PATH = Path("./config.toml")
 
 class TreeSearchConfig(BaseSettings):
     num_draft_nodes: int = 3
-    debug_prob: float = 0.5
+    debug_prob: float = 0.3
     epsilon: float = 0.3
     max_iterations: int = 10
-    satisfactory_threshold: float = 7.5
 
 
 class ExecConfig(BaseSettings):
@@ -21,7 +20,7 @@ class ExecConfig(BaseSettings):
 
 
 class CodeConfig(BaseSettings):
-    model: str = "gpt-4o"
+    model: str = "gpt-4.1"
     model_temp: float = 1.0
 
 

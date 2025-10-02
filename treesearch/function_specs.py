@@ -54,6 +54,49 @@ review_func_spec = FunctionSpec(
     description="Submit a review evaluating the output of the training script.",
 )
 
+score_code_func_spec = FunctionSpec(
+    name="score_code",
+    json_schema={
+        "type": "object",
+        "properties": {
+            "score": {
+                "type": "number",
+                "description": "A percentage score grading the quality of the code implementation. A higher percentage indicates better quality.",
+                "minimum": 0,
+                "maximum": 100,
+            },
+            "is_satisfactory": {
+                "type": "boolean",
+                "description": "true if the code implementation is satisfactory and meets all requirements, otherwise false.",
+            },
+            "feedback": {
+                "type": "string",
+                "description": "A short general feedback and the list of all requirements and whether they are fulfilled or not.",
+            },
+        },
+        "required": ["score", "is_satisfactory", "feedback"],
+    },
+    description="Score the code implementation and provide feedback on its quality.",
+)
+
+# TODO: Change requirements from string to dict with requirement and boolean or int (0/1)
+set_code_requirements_spec = FunctionSpec(
+    name="set_code_requirements",
+    json_schema={
+        "type": "object",
+        "properties": {
+            "requirements": {
+                "type": "string",
+                "description": "A numbered list of clear, specific code requirements.",
+            }
+        },
+        "required": ["requirements"],
+    },
+    description=(
+        "Set clear and specific code requirements for the implementation based on the research task."
+    ),
+)
+
 plot_selection_spec = FunctionSpec(
     name="select_plots",
     json_schema={

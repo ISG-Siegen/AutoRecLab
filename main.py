@@ -18,7 +18,7 @@ def main():
         "I placed the 'u.data' file of MovieLens100K in your current working directory. You can load it from there!"
     )
 
-    ts = TreeSearch(user_request, config)
+    ts = TreeSearch(user_request, config=config)
     ts.run()
 
 

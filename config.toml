@@ -3,7 +3,6 @@ num_draft_nodes = 3
 debug_prob = 0.5
 epsilon = 0.3
 max_iterations = 10
-satisfactory_threshold = 7.5
 
 [exec]
 timeout = 3600

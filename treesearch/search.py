@@ -43,7 +43,7 @@ class TreeSearch:
     @property
     def best_good_node(self):
         good_nodes = self.good_nodes
-        good_nodes.sort(key=lambda n: n.score.overall_score, reverse=True)
+        good_nodes.sort(key=lambda n: n.score.score, reverse=True)
         return good_nodes[0]
 
     def select_next_node(self) -> Node:
