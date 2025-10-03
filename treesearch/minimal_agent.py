@@ -8,13 +8,13 @@ import humanize
 
 from config import Config
 from treesearch.backend.llm import query
-from treesearch.backend.utils import extract_code, extract_text_up_to_code
 from treesearch.function_specs import (
     plot_selection_spec,
     review_func_spec,
     vlm_feedback_spec,
     score_code_func_spec,
     set_code_requirements_spec,
+    plan_and_code_spec,
 )
 from treesearch.interpreter import ExecutionResult
 from treesearch.node import Node, NodeScore
@@ -480,16 +480,16 @@ class MinimalAgent:
         """Generate a natural language plan + code in the same LLM call and split them apart."""
         completion_text = None
         for _ in range(retries):
-            completion_text = query(
+            plan_and_code_result = query(
                 system_message=prompt,
                 user_message=None,
+                func_spec=plan_and_code_spec,
                 model=self.cfg.agent.code.model,
                 temperature=self.cfg.agent.code.model_temp,
             )
 
-            code = extract_code(completion_text)
-            nl_text = extract_text_up_to_code(completion_text)
-
+            nl_text = plan_and_code_result.get("nl_text", "")
+            code = plan_and_code_result.get("code", "")
             if code and nl_text:
                 # merge all code blocks into a single string
                 return nl_text, code
