@@ -113,3 +113,22 @@ plot_selection_spec = FunctionSpec(
     },
     description="Select the 10 most relevant plots for analysis",
 )
+
+plan_and_code_spec  = FunctionSpec(
+    name="return_plan_and_code",
+    json_schema={
+        "type": "object",
+        "properties": {
+            "nl_text": {
+                "type": "string",
+                "description": "Explanatory natural language text describing the plan or reasoning behind the code."
+            },
+            "code": {
+                "type": "string",
+                "description": "The complete Python source code implementing the plan."
+            }
+        },
+        "required": ["nl_text", "code"],
+    },
+    description= "Return a natural language plan and the Python code that implements it."
+)
