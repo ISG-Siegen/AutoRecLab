@@ -6,3 +6,5 @@ services:
       - ./sandbox:/app/out
     env_file:
       - .env
+    stdin_open: true
+    tty: true
