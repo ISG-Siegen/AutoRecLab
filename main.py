@@ -10,13 +10,15 @@ def main():
 
     config = load_config()
 
-    # TODO:
-    user_request = (
-        "Which of these LensKit algorithms performs the best on MovieLens100K?"
-        "- ItemItem"
-        "- BiasedMF"
-        "I placed the 'u.data' file of MovieLens100K in your current working directory. You can load it from there!"
-    )
+    user_req_lines: list[str] = []
+    print('Enter you request, write "!start" to start:')
+    while True:
+        line = input("> ")
+        if line.lower().strip().startswith("!start"):
+            break
+        user_req_lines.append(line)
+
+    user_request = "\n".join(user_req_lines)
 
     ts = TreeSearch(user_request, config=config)
     ts.run()
