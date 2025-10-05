@@ -1,0 +1,8 @@
+services:
+  sandbox:
+    build:
+      context: .
+    volumes:
+      - ./sandbox:/app/out
+    env_file:
+      - .env
