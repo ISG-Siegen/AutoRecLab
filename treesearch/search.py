@@ -117,6 +117,6 @@ The idea is:\n
         return task_desc
 
     def save(self):
-        with open("./save.pkl", "wb") as f:
+        with open("./out/save.pkl", "wb") as f:
             logger.warning(f"SAVING {len(self._draft_nodes)}.....")
             pickle.dump(self._draft_nodes, f)
