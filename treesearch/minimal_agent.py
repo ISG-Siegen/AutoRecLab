@@ -61,7 +61,9 @@ class MinimalAgent:
         self.stage_name = stage_name
         self.data_preview = None
         self._set_code_requirements()
-        Path("./out/code_requirements.json").write_text(json.dumps(self.code_requirements))
+        Path("./out/code_requirements.json").write_text(
+            json.dumps(self.code_requirements)
+        )
 
     @property
     def _prompt_environment(self):
@@ -505,8 +507,7 @@ class MinimalAgent:
         return "", completion_text  # type: ignore
 
     def _set_code_requirements(self):
-        requirements_prompt = (
-            f"""You are an expert recommender systems researcher. 
+        requirements_prompt = f"""You are an expert recommender systems researcher. 
             You are provided with the following research task:\n{self.task_desc}\n" 
             Your job is to formulate a clear, concise list of essential requirements that the code implementation must fulfill to successfully address this research task. 
             Each requirement should be specific, actionable, and directly related to the research task. 
@@ -514,16 +515,17 @@ class MinimalAgent:
             A successful experiment means the code is technically AND conceptually correct, runs without errors, and produces meaningful results that align with the research task.
             Avoid vague language and keep each requirement as brief and precise as possible.
             """
-        )
-        requirements_result = query(        
+        requirements_result = query(
             system_message=requirements_prompt,
             user_message=None,
             model=self.cfg.agent.code.model,
             temperature=self.cfg.agent.code.model_temp,
-            func_spec=set_code_requirements_spec
+            func_spec=set_code_requirements_spec,
         )
-        self.code_requirements = requirements_result.get("requirements", "No specific requirements provided.")
-    
+        self.code_requirements = requirements_result.get(
+            "requirements", "No specific requirements provided."
+        )
+
     def score_code(self, node: Node, exec_result: ExecutionResult) -> Node:
         """Analyze execution results using both review function spec and scoring system."""
         node.absorb_exec_result(exec_result)
@@ -620,7 +622,8 @@ class MinimalAgent:
         # If the node is not buggy, use the scoring system
         scoring_prompt = {
             f"Instructions": (
-                f"""You are an expert recommender system researcher conducting a code review for an important experiment. You are provided the research task, the code implementation and the execution output. You must score the code using the following requirements: \n{self.code_requirements}\n. Each requirement can either be fullfilled or not fulfilled. The score is the percentage of requirements that are fulfilled, e.g. if 7 out of 10 requirements are fulfilled, the score is 70. Additionally, you provide clear and constructive feedback how to improve the code implementation based on the requirements."""),
+                f"""You are an expert recommender system researcher conducting a code review for an important experiment. You are provided the research task, the code implementation and the execution output. You must score the code using the following requirements: \n{self.code_requirements}\n. Each requirement can either be fullfilled or not fulfilled. The score is the percentage of requirements that are fulfilled, e.g. if 7 out of 10 requirements are fulfilled, the score is 70. Additionally, you provide clear and constructive feedback how to improve the code implementation based on the requirements."""
+            ),
             f"Research Task": (self.task_desc),
             f"Implementation": (wrap_code(node.code)),
             f"Execution output": (wrap_code(node.term_out, lang="")),
@@ -636,7 +639,7 @@ class MinimalAgent:
             )
 
             # Parse the structured response
-            node.score = NodeScore( 
+            node.score = NodeScore(
                 score=scoring_result.get("score", 0.0),
                 feedback=scoring_result.get("feedback", ""),
                 is_satisfactory=scoring_result.get("is_satisfactory", False),
@@ -696,6 +699,50 @@ class MinimalAgent:
         #     ],
         # }
 
+    def _summarize(self, user_request: str, node: Node) -> str:
+        """Summarizes the results of a node and returns a human readable report.
+
+        Args:
+            user_request (str): The original request of the user.
+            node (Node): Node to summarize.
+
+        Returns:
+            str: A summary/answer to the user request based on the node's code and execution output.
+        """
+
+        summary_prompt = {
+            "Introduction": (
+                "You are an expert research assistant responding to the user in a conversational setting. "
+                "You have access to the code and the experiment output. "
+                "Your task is to answer the user's request based solely on these materials. "
+                "Use the code to understand what was tested and the output to determine the results. "
+                "Do not hallucinate, speculate, or assume any information that is not explicitly contained in the output. "
+                "If the available information is insufficient, explain the limitation clearly and remain factual."
+            ),
+            "User Request": user_request,
+            "Experiment Code": wrap_code(node.code),
+            "Experiment Output": wrap_code(
+                node.term_out if node.term_out else "No experiment output available.",
+                lang="",
+            ),
+            "Instructions": [
+                "1. Use the code to interpret what the experiment did and what metrics or results are relevant.",
+                "2. Read the output carefully and extract factual findings that answer the user request.",
+                "3. Formulate your response as if chatting directly with the user — clear, concise, and natural.",
+                "4. Do not output any structured formats or metadata (no JSON, tables, etc.) unless the user request explicitly asks for it.",
+                "5. Be confident, factual, and grounded only in the provided information.",
+                "6. If the experiment output is ambiguous or incomplete, mention this explicitly instead of guessing.",
+            ],
+        }
+
+        # HACK: Str casting:
+        # We should make query generic or split it into 2 function for normal query and for tool usage or smth
+        return str(query(
+            summary_prompt,
+            None,
+            self.cfg.agent.code.model,
+            self.cfg.agent.code.model_temp,
+        ))
 
     def _generate_plotting_code(
         self,
