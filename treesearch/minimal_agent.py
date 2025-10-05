@@ -1,5 +1,7 @@
 import base64
+import json
 import os
+from pathlib import Path
 import random
 import re
 from typing import Any, Optional, cast
@@ -58,7 +60,8 @@ class MinimalAgent:
         self.evaluation_metrics = evaluation_metrics
         self.stage_name = stage_name
         self.data_preview = None
-        self.code_requirements = self._set_code_requirements()
+        self._set_code_requirements()
+        Path("./out/code_requirements.json").write_text(json.dumps(self.code_requirements))
 
     @property
     def _prompt_environment(self):
