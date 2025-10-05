@@ -103,9 +103,9 @@ class Node(NodeMixin):
         if len(self.plan) > 0:
             plan_max_chars = 25
             dots = "..." if len(self.plan) > plan_max_chars else ""
-            return f"{__class__.__name__}({short_id},\n{self.plan[:plan_max_chars]}{dots}\nbuggy={self.is_buggy})"
+            return f"{__class__.__name__}({short_id},\n{self.plan[:plan_max_chars]}{dots}\nbuggy={self.is_buggy}\nscore={self.score.score})"
         else:
-            return f"{__class__.__name__}({short_id}\nbuggy={self.is_buggy})"
+            return f"{__class__.__name__}({short_id}\nbuggy={self.is_buggy}\nscore={self.score.score})"
 
     def __post_init__(self):
         self.parent = self._parent
