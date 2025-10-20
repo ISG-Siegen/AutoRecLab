@@ -8,4 +8,7 @@ RUN uv sync
 
 COPY . /app
 
-ENTRYPOINT ["uv", "run", "main.py"]
+RUN echo 'PS1="\[\e[96;1m\]AutoRecLab\[\e[0m\] \\$ "' >> /etc/bash.bashrc
+
+# ENTRYPOINT ["uv", "run", "main.py"]
+ENTRYPOINT ["bash"]
