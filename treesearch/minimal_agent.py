@@ -1,19 +1,14 @@
-import base64
 import json
-import os
 from pathlib import Path
 import random
-import re
-from typing import Any, Optional, cast
+from typing import Any, Optional
 
 import humanize
 
 from config import Config
 from treesearch.backend.llm import query
 from treesearch.function_specs import (
-    plot_selection_spec,
     review_func_spec,
-    vlm_feedback_spec,
     score_code_func_spec,
     set_code_requirements_spec,
     plan_and_code_spec,
@@ -54,6 +49,7 @@ class MinimalAgent:
         stage=None,
         stage_name=None,
     ):
+        logger.info("Initializing agent...")
         self.task_desc = task_desc
         self.memory_summary = memory_summary
         self.cfg = cfg
@@ -64,6 +60,7 @@ class MinimalAgent:
         Path("./out/code_requirements.json").write_text(
             json.dumps(self.code_requirements)
         )
+        logger.info("Agent initialized!")
 
     @property
     def _prompt_environment(self):
@@ -507,6 +504,7 @@ class MinimalAgent:
         return "", completion_text  # type: ignore
 
     def _set_code_requirements(self):
+        logger.info("Engineering code requirements...")
         requirements_prompt = f"""You are an expert recommender systems researcher. 
             You are provided with the following research task:\n{self.task_desc}\n" 
             Your job is to formulate a clear, concise list of essential requirements that the code implementation must fulfill to successfully address this research task. 
@@ -525,6 +523,7 @@ class MinimalAgent:
         self.code_requirements = requirements_result.get(
             "requirements", "No specific requirements provided."
         )
+        logger.info("Done.")
 
     def score_code(self, node: Node, exec_result: ExecutionResult) -> Node:
         """Analyze execution results using both review function spec and scoring system."""
@@ -709,6 +708,7 @@ class MinimalAgent:
         Returns:
             str: A summary/answer to the user request based on the node's code and execution output.
         """
+        logger.info("Summarizing results...")
 
         summary_prompt = {
             "Introduction": (
@@ -737,12 +737,14 @@ class MinimalAgent:
 
         # HACK: Str casting:
         # We should make query generic or split it into 2 function for normal query and for tool usage or smth
-        return str(query(
-            summary_prompt,
-            None,
-            self.cfg.agent.code.model,
-            self.cfg.agent.code.model_temp,
-        ))
+        return str(
+            query(
+                summary_prompt,
+                None,
+                self.cfg.agent.code.model,
+                self.cfg.agent.code.model_temp,
+            )
+        )
 
     def _generate_plotting_code(
         self,

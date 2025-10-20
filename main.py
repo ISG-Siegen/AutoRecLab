@@ -2,7 +2,9 @@ import os
 
 from config import load_config
 from treesearch.search import TreeSearch
-from utils.log import set_log_level
+from utils.log import set_log_level, _ROOT_LOGGER
+
+logger = _ROOT_LOGGER.getChild("main")
 
 
 def main():
@@ -19,6 +21,8 @@ def main():
         user_req_lines.append(line)
 
     user_request = "\n".join(user_req_lines)
+
+    logger.info("Starting AutoRecLab...")
 
     ts = TreeSearch(user_request, config=config)
     ts.run()

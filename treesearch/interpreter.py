@@ -6,7 +6,6 @@ Supports:
 - limits execution time
 """
 
-import logging
 import os
 import queue
 import signal
@@ -20,7 +19,9 @@ from pathlib import Path
 import humanize
 from dataclasses_json import DataClassJsonMixin
 
-logger = logging.getLogger("ai-scientist")
+from utils.log import _ROOT_LOGGER
+
+logger = _ROOT_LOGGER.getChild("interpreter")
 
 
 @dataclass
@@ -98,15 +99,17 @@ class Interpreter:
             env_vars (dict[str, str], optional): Environment variables to set in the child process. Defaults to {}.
         """
         # this really needs to be a path, otherwise causes issues that don't raise exc
+        logger.info("Initializing agent...")
         self.working_dir = Path(working_dir).resolve()
-        assert self.working_dir.exists(), (
-            f"Working directory {self.working_dir} does not exist"
-        )
+        assert (
+            self.working_dir.exists()
+        ), f"Working directory {self.working_dir} does not exist"
         self.timeout = timeout
         self.format_tb_ipython = format_tb_ipython
         self.agent_file_name = agent_file_name
         self.process: Process = None  # type: ignore
         self.env_vars = env_vars
+        logger.info("Interpreter initialized!")
 
     def child_proc_setup(self, result_outq: Queue) -> None:
         # disable all warnings (before importing anything)
@@ -299,24 +302,6 @@ class Interpreter:
         while not self.result_outq.empty() or not output or output[-1] != "<|EOF|>":
             output.append(self.result_outq.get())
         output.pop()  # remove the EOF marker
-
-        # HACK:
-        log_copy_file = (
-            Path(__file__).parent.parent.parent.parent
-            / "log_copies"
-            / f"logcopy{time.time()}.out"
-        )
-        log_copy_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(log_copy_file, "a") as log_copy_h:
-            log_copy_h.write(f"##############\n")
-            log_copy_h.write(f"#### CODE ####\n")
-            log_copy_h.write(f"##############\n")
-            log_copy_h.write(code)
-            log_copy_h.write("")
-            log_copy_h.write(f"################\n")
-            log_copy_h.write(f"#### OUTPUT ####\n")
-            log_copy_h.write(f"################\n")
-            log_copy_h.write("\n".join(output))
 
         e_cls_name, exc_info, exc_stack = state[1:]
 

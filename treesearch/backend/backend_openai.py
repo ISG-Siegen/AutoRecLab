@@ -1,14 +1,15 @@
 import json
-import logging
 import time
 
 import openai
 from funcy import notnone, once, select_values
-from rich import print
+
+from utils.log import _ROOT_LOGGER
+
 
 from .utils import FunctionSpec, OutputType, backoff_create, opt_messages_to_list
 
-logger = logging.getLogger("ai-scientist")
+logger = _ROOT_LOGGER.getChild("backend/openai")
 
 _client: openai.OpenAI = None  # type: ignore
 
@@ -56,14 +57,14 @@ def query(
     if func_spec is None:
         output = choice.message.content
     else:
-        assert choice.message.tool_calls, (
-            f"function_call is empty, it is not a function call: {choice.message}"
-        )
-        assert choice.message.tool_calls[0].function.name == func_spec.name, (
-            "Function name mismatch"
-        )
+        assert (
+            choice.message.tool_calls
+        ), f"function_call is empty, it is not a function call: {choice.message}"
+        assert (
+            choice.message.tool_calls[0].function.name == func_spec.name
+        ), "Function name mismatch"
         try:
-            print(f"[cyan]Raw func call response: {choice}[/cyan]")
+            logger.debug(f"[cyan]Raw func call response: {choice}[/cyan]")
             output = json.loads(choice.message.tool_calls[0].function.arguments)
         except json.JSONDecodeError as e:
             logger.error(

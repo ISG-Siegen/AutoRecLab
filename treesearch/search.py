@@ -3,7 +3,6 @@ import random
 from pathlib import Path
 
 from anytree import PreOrderIter
-from marshmallow import pre_dump
 
 from config import Config
 
@@ -61,6 +60,7 @@ class TreeSearch:
             return self.best_good_node
 
     def run(self):
+        logger.info("Starting tree search...")
         # Step 1: Generate draft nodes:
         for i in range(self._config.treesearch.num_draft_nodes):
             logger.info(
@@ -98,12 +98,12 @@ class TreeSearch:
 
     def exec_node(self, node: Node) -> Node:
         exec_result = self._interpreter.run(node.code)
-        print(exec_result)
+        logger.debug(exec_result)
         self._minimal_agent.score_code(node, exec_result)
         return node
 
     def print_experiment_summary(self, result_node: Node):
-        print("Final response:")
+        logger.info("Final response:")
         print(self._minimal_agent._summarize(self._user_request, result_node))
 
     @property
