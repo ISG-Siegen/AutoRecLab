@@ -85,15 +85,19 @@ Edit `config.toml` to customize agent behavior:
 [treesearch]
 num_draft_nodes = 3      # Number of initial implementations to generate
 max_iterations = 10      # Maximum improvement iterations
-debug_prob = 0.5         # Probability of debugging vs improving (0.0-1.0)
+debug_prob = 0.3         # Probability of debugging vs improving (0.0-1.0)
 epsilon = 0.3            # Exploration vs exploitation rate
 
 [exec]
 timeout = 3600           # Execution timeout in seconds
 workspace = "./workspace"
 
+[agent]
+k_fold_validation = 1    # Preferred number of folds for validation (1 = no CV)
+data_preview = false     # Tells the LLM to give an overview of the dataset structure
+
 [agent.code]
-model = "o4-mini"        # LLM model to use
+model = "o5-mini"        # LLM model to use
 model_temp = 1.0         # Temperature for code generation
 ```
 
