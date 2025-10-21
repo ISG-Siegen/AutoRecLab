@@ -55,7 +55,8 @@ class MinimalAgent:
         self.cfg = cfg
         self.evaluation_metrics = evaluation_metrics
         self.stage_name = stage_name
-        self.data_preview = None
+        # HACK:
+        # self.data_preview = None
         self._set_code_requirements()
         Path("./out/code_requirements.json").write_text(
             json.dumps(self.code_requirements)
@@ -255,8 +256,8 @@ class MinimalAgent:
         prompt["Instructions"] |= self._prompt_impl_guideline
         prompt["Instructions"] |= self._prompt_environment
 
-        if self.cfg.agent.data_preview:
-            prompt["Data Overview"] = self.data_preview
+        # if self.cfg.agent.data_preview:
+        #     prompt["Data Overview"] = self.data_preview
 
         print("[cyan]--------------------------------[/cyan]")
         print("[cyan]self.task_desc[/cyan]")
@@ -319,8 +320,8 @@ class MinimalAgent:
         }
         prompt["Instructions"] |= self._prompt_impl_guideline
 
-        if self.cfg.agent.data_preview:
-            prompt["Data Overview"] = self.data_preview
+        # if self.cfg.agent.data_preview:
+        #     prompt["Data Overview"] = self.data_preview
 
         plan, code = self.plan_and_code_query(prompt)
         return Node(plan=plan, code=code, _parent=parent_node)

@@ -10,7 +10,6 @@ workspace = "./workspace"
 
 [agent]
 k_fold_validation = 1
-data_preview = false
 
 [agent.code]
 model = "gpt-5-mini"

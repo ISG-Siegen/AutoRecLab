@@ -26,7 +26,6 @@ class CodeConfig(BaseSettings):
 
 class AgentConfig(BaseSettings):
     k_fold_validation: int = 1
-    data_preview: bool = False
     code: CodeConfig = CodeConfig()
 
 
