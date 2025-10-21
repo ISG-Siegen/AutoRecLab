@@ -1,0 +1,17 @@
+[treesearch]
+num_draft_nodes = 3
+debug_prob = 0.5
+epsilon = 0.3
+max_iterations = 10
+
+[exec]
+timeout = 3600
+workspace = "./workspace"
+
+[agent]
+k_fold_validation = 1
+data_preview = false
+
+[agent.code]
+model = "o4-mini"
+model_temp = 1.0
