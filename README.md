@@ -1,4 +1,4 @@
-# AI4Science - Recommender Systems Research Agent
+# AutoRecLab v1: Towards an Autonomous Recommender-Systems Researcher
 
 An autonomous AI agent that uses tree search to iteratively develop, debug, and improve code implementations for recommender systems research tasks.
 
