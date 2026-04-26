@@ -65,13 +65,13 @@ class MinimalAgent:
     @property
     def _prompt_environment(self):
         pkgs = [
-            "Primary: omnirec==0.2.0",
+            "Primary modeling: lenskit==2025.6.2",
+            "Dataset loading: omnirec==0.2.0",
             "numpy==1.26.4",
             "numba==0.58.1",
             "pandas==2.3.2",
             "scipy==1.16.2",
             "scikit-learn==1.7.1",
-            "lenskit==2025.6.2",
             "matplotlib==3.10.7",
         ]
         pkg_str = ", ".join([f"`{p}`" for p in pkgs])
@@ -85,7 +85,7 @@ class MinimalAgent:
     def _prompt_impl_guideline(self):
         impl_guideline = [
             "Implementation Guidelines:",
-            f"1. Framework: Use OmniRec exclusively (wraps Lenskit, RecBole, RecPack, Elliot, etc.). Search these docs when unsure: {VECTOR_STORE_NAMES}. NEVER implement algorithms from scratch or call Lenskit/RecBole/other backend libraries directly — always go through the OmniRec API.",
+            f"1. Framework split: Use OmniRec ONLY for dataset loading/preprocessing/splitting, and use LensKit directly for recommender modeling/training/prediction/evaluation. Search these docs when unsure: {VECTOR_STORE_NAMES}. NEVER implement recommender algorithms from scratch, and do not use RecBole/other backend libraries directly.",
             f"2. Datasets: Use only: {', '.join(self.selected_datasets)}",
             "3. Code Structure:",
             "   - Single-file Python script with `if __name__ == '__main__':`",
@@ -290,10 +290,10 @@ class MinimalAgent:
             await Query(tool_budget=40)
             .with_mcp(self._mcp_docs)
             .with_system(
-                f"You are a Senior Recommender Systems Engineer specializing in the OmniRec library. "
-                f"Available documentation (OmniRec and libraries that OmniRec can use): {VECTOR_STORE_NAMES}.\n"
+                f"You are a Senior Recommender Systems Engineer specializing in LensKit-based experimentation. "
+                f"Available documentation (LensKit, OmniRec dataset utilities, and related libraries): {VECTOR_STORE_NAMES}.\n"
                 "\n"
-                "CRITICAL: You MUST use OmniRec for all recommender system functionality. Do NOT fall back to raw Lenskit, RecBole, or any other backend library directly. If you cannot find the right OmniRec API, search the documentation further — do not bypass OmniRec.\n"
+                "CRITICAL: You MUST use LensKit for recommender system functionality (modeling, training, prediction, evaluation). You MUST use OmniRec APIs/utilities for dataset loading and dataset preparation. Do NOT use OmniRec model wrappers or RecBole/other backend libraries for modeling.\n"
                 "\n"
                 "Search documentation to verify API details. Process:\n"
                 "1. Identify needed components → 2. Search + verify each → 3. Document findings → 4. Implement\n"
@@ -330,7 +330,7 @@ class MinimalAgent:
             await Query()
             .with_mcp(self._mcp_docs)
             .with_system(
-                "Search OmniRec documentation for dataset characteristics and usage patterns if needed."
+                "Search OmniRec documentation for dataset characteristics/loading usage, and LensKit documentation for modeling/evaluation compatibility if needed."
             )
             .run(prompt, SelectDatasets)
         )
@@ -361,7 +361,7 @@ class MinimalAgent:
         4. Coverage: Include requirements for all essential aspects:
         - Data loading and preprocessing
         - Experimental methodology (data splitting, reproducibility requirements)
-        - Model/algorithm selection and configuration — ALWAYS include a requirement that OmniRec must be used for all recommender system functionality; raw backend libraries (Lenskit, RecBole, etc.) must not be called directly
+        - Model/algorithm selection and configuration — ALWAYS include a requirement that LensKit is used for all recommender system functionality, while dataset loading/preparation is performed via OmniRec APIs/utilities
         - Training procedures
         - Evaluation methodology and metrics
         - Critical outputs and results
@@ -372,7 +372,7 @@ class MinimalAgent:
             await Query()
             .with_mcp(self._mcp_docs)
             .with_system(
-                "Reference documentation for OmniRec framework and dataset details if needed to ensure requirements are feasible. Prioritize implementation guides and API references."
+                "Reference LensKit API documentation for modeling/evaluation and OmniRec documentation for dataset loading/preparation to ensure requirements are feasible. Prioritize implementation guides and API references."
             )
             .run(requirements_prompt, CodeRequirements)
         )
