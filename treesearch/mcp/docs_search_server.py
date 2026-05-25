@@ -1,17 +1,47 @@
+import pickle
 from pathlib import Path
 from typing import Literal, get_args
 
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from mcp.server.fastmcp import FastMCP
 
 load_dotenv()
 mcp = FastMCP("Documentation search")
-embedding_model = OpenAIEmbeddings(model="text-embedding-3-large")
+embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 VECTOR_STORES_BASE_PTH = Path("./ragEmbeddings")
 VECTOR_STORE_NAMES = Literal["omnirec", "lenskit", "recbole"]
+
+
+def _rebuild_vector_store(name: str) -> FAISS:
+    """Rebuild a FAISS vector store from the existing docstore using local embeddings."""
+    vector_store_pth = VECTOR_STORES_BASE_PTH / name
+    pkl_path = vector_store_pth / "index.pkl"
+    with open(pkl_path, "rb") as f:
+        data = pickle.load(f)
+
+    # pkl format: (InMemoryDocstore, {int_index: docstore_id})
+    docstore, index_to_docstore_id = data
+    docs = []
+    for idx in sorted(index_to_docstore_id.keys()):
+        doc_id = index_to_docstore_id[idx]
+        doc = docstore.search(doc_id)
+        docs.append(doc)
+
+    # Rebuild with local embeddings
+    vector_store = FAISS.from_documents(documents=docs, embedding=embedding_model)
+    vector_store.save_local(str(vector_store_pth))
+    return vector_store
+
+
+def _get_embedding_dim() -> int:
+    """Get the dimension of the local embedding model."""
+    return len(embedding_model.embed_query("test"))
+
+
+EMBEDDING_DIM = _get_embedding_dim()
 
 
 def load_vector_store(name: str) -> FAISS:
@@ -20,11 +50,15 @@ def load_vector_store(name: str) -> FAISS:
         raise FileNotFoundError(
             f"Could not read in store at '{vector_store_pth}'! Did you generate or download the embeddings first?"
         )
-    return FAISS.load_local(
+    store = FAISS.load_local(
         str(vector_store_pth),
         embedding_model,
         allow_dangerous_deserialization=True,
     )
+    # If stored index has different dimensions, rebuild with local model
+    if store.index.d != EMBEDDING_DIM:
+        return _rebuild_vector_store(name)
+    return store
 
 
 VECTOR_STORES: dict[str, FAISS] = {
