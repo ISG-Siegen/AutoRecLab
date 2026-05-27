@@ -214,8 +214,25 @@ class TreeSearch:
     async def finalize_search(self, result_node: Node):
         self._interpreter.cleanup_session()
         logger.info(f"Finalizing search with node: {result_node.id}")
+        final_report = await self._minimal_agent._summarize(self._user_request, result_node)
+        report_path = self._out_dir / "final_report.txt"
+        self._write_text_report(report_path, final_report, result_node)
+        logger.info(f"Final report written to {report_path}")
         logger.info("Final response:")
-        print(await self._minimal_agent._summarize(self._user_request, result_node))
+        print(final_report)
+
+    def _write_text_report(self, report_path: Path, final_report: str, result_node: Node) -> None:
+        report_text = "\n".join(
+            [
+                "AutoRecLab Final Report",
+                f"Selected node: {result_node.id}",
+                f"Score: {result_node.score.score:.4f}",
+                "",
+                final_report,
+                "",
+            ]
+        )
+        report_path.write_text(report_text, encoding="utf-8")
 
     @property
     def _task_desc(self) -> str:
