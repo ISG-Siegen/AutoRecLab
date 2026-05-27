@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import humanize
+from rich.console import Console
 
 from config import Config
 from treesearch.function_specs import (
@@ -22,6 +23,7 @@ from treesearch.utils.response import strip_markdown_fences
 from utils.log import _ROOT_LOGGER
 from utils.path import mkdir
 
+console = Console()
 logger = _ROOT_LOGGER.getChild("nodeAgent")
 
 
@@ -139,10 +141,10 @@ class MinimalAgent:
         prompt["Instructions"] |= self._prompt_impl_guideline
         prompt["Instructions"] |= self._prompt_environment
 
-        print("[cyan]--------------------------------[/cyan]")
-        print("[cyan]self.task_desc[/cyan]")
-        print("[cyan]" + self.task_desc + "[/cyan]")
-        print("[cyan]--------------------------------[/cyan]")
+        console.print("--------------------------------", style="cyan")
+        console.print("self.task_desc", style="cyan")
+        console.print(self.task_desc, style="cyan")
+        console.print("--------------------------------", style="cyan")
 
         print("MinimalAgent: Getting plan and code")
         plan, code = await self.plan_and_code_query(prompt)
