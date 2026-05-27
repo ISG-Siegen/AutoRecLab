@@ -4,7 +4,6 @@ from argparse import ArgumentParser
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from anytree import Node as AnyNode
 from anytree.exporter.dotexporter import UniqueDotExporter
 
 from treesearch.node import Node
@@ -33,10 +32,11 @@ def _short_id(node_id: str) -> str:
     return f"{node_id[:4]}..{node_id[-4:]}"
 
 
-def _node_attr(node: Node) -> str:
-    if getattr(node, "is_virtual_root", False):
-        return 'style="invis" label="" width="0" height="0"'
+def _nodename(node: Node) -> str:
+    return f"node_{node.id}"
 
+
+def _node_attr(node: Node) -> str:
     fill, border, font = _score_color(node)
     score_val = getattr(node.score, "score", 0.0)
     satisfactory = getattr(node.score, "is_satisfactory", False)
@@ -71,9 +71,6 @@ def _node_attr(node: Node) -> str:
 
 
 def _edge_attr(node: Node, child: Node) -> str:
-    if getattr(node, "is_virtual_root", False):
-        return 'style="invis"'
-
     _, border, _ = _score_color(child)
     return (
         f'color="{border}" '
@@ -93,27 +90,61 @@ GRAPH_OPTIONS = [
 ]
 
 
-def render_trees(nodes: list[Node], output_dir: Path):
-    if not nodes:
-        return
-
-    virtual_root = AnyNode("VIRTUAL_ROOT")
-    virtual_root.is_virtual_root = True
-
-    for root in nodes:
-        root.parent = virtual_root
-
+def _export_tree(root_node, name: str, output_dir: Path):
     with TemporaryDirectory() as tmp_dir:
-        tmp_dir = Path(tmp_dir)
-        tmp_file = tmp_dir / "tmp.dot"
+        tmp_file = Path(tmp_dir) / "tmp.dot"
 
         e = UniqueDotExporter(
-            virtual_root,
+            root_node,
+            nodenamefunc=_nodename,
             nodeattrfunc=_node_attr,
             edgeattrfunc=_edge_attr,
             options=GRAPH_OPTIONS,
         )
         e.to_dotfile(tmp_file)
+
+        for fmt in ["png", "pdf", "svg"]:
+            fmt_dir = mkdir(output_dir / fmt)
+            out_file = fmt_dir / f"{name}.{fmt}"
+
+            cmd = ["dot", str(tmp_file), f"-T{fmt}", "-o", str(out_file)]
+            if fmt == "png":
+                cmd.append("-Gdpi=192")
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"[{name}] dot error ({fmt}): {result.stderr.strip()}")
+            else:
+                print(f"[{name}] → {out_file}")
+
+
+def render_trees(nodes: list[Node], output_dir: Path):
+    if not nodes:
+        return
+
+    for i, root in enumerate(nodes):
+        _export_tree(root, f"tree_{i}", output_dir)
+
+    combined_options = GRAPH_OPTIONS + ['pack="true"', 'packmode="array_v"']
+
+    with TemporaryDirectory() as tmp_dir:
+        tmp_file = Path(tmp_dir) / "combined.dot"
+        with open(tmp_file, "w", encoding="utf-8") as f:
+            f.write("digraph combined {\n")
+            for opt in combined_options:
+                f.write(f"    {opt};\n")
+
+            for root in nodes:
+                e = UniqueDotExporter(
+                    root,
+                    nodenamefunc=_nodename,
+                    nodeattrfunc=_node_attr,
+                    edgeattrfunc=_edge_attr,
+                )
+                lines = list(e)
+                for line in lines[1:-1]:
+                    f.write(line)
+            f.write("}\n")
 
         for fmt in ["png", "pdf", "svg"]:
             fmt_dir = mkdir(output_dir / fmt)
@@ -125,12 +156,9 @@ def render_trees(nodes: list[Node], output_dir: Path):
 
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
-                print(f"[combined] dot error ({fmt}): {result.stderr.strip()}")
+                print(f"[combined_tree] dot error ({fmt}): {result.stderr.strip()}")
             else:
-                print(f"[combined] → {out_file}")
-
-    for root in nodes:
-        root.parent = None
+                print(f"[combined_tree] → {out_file}")
 
 
 def main():
