@@ -2,6 +2,7 @@ import json
 import random
 from pathlib import Path
 from typing import Any, Optional
+import asyncio
 
 import humanize
 
@@ -513,8 +514,10 @@ class MinimalAgent:
         # Proceed with detailed scoring regardless of bug status
         logger.info("Proceeding with detailed scoring")
 
-        # Use the scoring system
-        for req in node.requirements:
+        # Score each requirement with an independent LLM call.
+        # Requirements are independent of each other, so we evaluate them
+        # concurrently with asyncio.gather to reduce wall-clock time.
+        async def _score_requirement(req: Requirement) -> None:
             logger.debug("Scoring requirement: %s", req.description)
             scoring_prompt: Prompt = {
                 "Instructions": (
@@ -554,6 +557,8 @@ class MinimalAgent:
                 # Fallback requirement feedback
                 req.is_fulfilled = False
                 req.feedback = "No specific feedback provided."
+
+        await asyncio.gather(*(_score_requirement(req) for req in node.requirements))
 
         all_fulfilled = all(r.is_fulfilled for r in node.requirements)
         logger.debug("All requirements fulfilled=%s", all_fulfilled)
