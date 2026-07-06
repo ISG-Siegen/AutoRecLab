@@ -53,6 +53,13 @@ async def main():
         config.agent.code = config.agent.code.model_copy(update={"model": args.model})
 
 
+    # Isolate this run's outputs in a timestamped subdirectory so artifacts from
+    # different runs are not mixed in the same out/ directory.
+    run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    config = config.model_copy(update={"out_dir": str(Path(config.out_dir) / f"run_{run_id}")})
+    out_dir = mkdir(config.out_dir)
+
+
     # Prepare to run AutoRecLab
     attach_file_handler(out_dir)
     cost_tracker.set_out_dir(out_dir)
