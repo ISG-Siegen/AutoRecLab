@@ -62,6 +62,9 @@ class Node(NodeMixin):
     type_check_passed: bool = field(default=False)
     type_check_results: list[TypeCheckResult] = field(default_factory=list)
 
+    # ---- debug retry limiting ----
+    debug_attempts: int = field(default=0)
+
     @property
     def name(self) -> str:
         short_id = f"{self.id[:4]}...{self.id[-4:]}"
@@ -107,6 +110,8 @@ class Node(NodeMixin):
         """Set state during unpickling"""
         # Ensure all required attributes are present
         self.__dict__.update(state)
+        if "debug_attempts" not in self.__dict__:
+            self.debug_attempts = 0
 
     def absorb_exec_result(self, exec_result: ExecutionResult):
         """Absorb the result of executing the code from this node."""
