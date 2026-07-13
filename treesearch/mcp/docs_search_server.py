@@ -1,17 +1,18 @@
 from pathlib import Path
-from typing import Literal, get_args
+from typing import get_args
 
 from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
 from mcp.server.fastmcp import FastMCP
 
+from treesearch.mcp.docs_search_types import VECTOR_STORE_NAMES
+
 load_dotenv()
 mcp = FastMCP("Documentation search")
 embedding_model = OpenAIEmbeddings(model="text-embedding-3-large")
 
 VECTOR_STORES_BASE_PTH = Path("./ragEmbeddings")
-VECTOR_STORE_NAMES = Literal["omnirec", "lenskit", "recbole"]
 
 
 def load_vector_store(name: str) -> FAISS:

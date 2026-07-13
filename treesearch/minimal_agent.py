@@ -15,7 +15,7 @@ from treesearch.function_specs import (
 )
 from treesearch.interpreter import ExecutionResult
 from treesearch.llm.query import MCPConnection, Prompt, Query
-from treesearch.mcp.docs_search_server import VECTOR_STORE_NAMES
+from treesearch.mcp.docs_search_types import VECTOR_STORE_NAMES
 from treesearch.node import Node, NodeScore, Requirement
 from treesearch.utils.available_datasets import get_datasets_table
 from treesearch.utils.response import strip_markdown_fences
