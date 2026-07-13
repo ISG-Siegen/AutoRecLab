@@ -1,307 +1,204 @@
 > [!CAUTION]
-> This is the active **development branch** (`develop`) of AutoRecLab v2.
+> This is the active **development branch** (`develop`) of AutoRecLab.
 >
 > - Features can change at any time.
 > - Interfaces and prompts may be unstable.
 > - Experimental behavior is expected.
 >
-> For the latest stable release (v1), use the [`main`](../../tree/main) branch.
+> For the latest stable release, use the [`main`](../../tree/main) branch.
 
-### Prerequisites: Embeddings
+# AutoRecLab
 
-This version of AutoRecLab requires pre-generated embeddings for LensKit, RecBole, and OmniRec libraries.
-For the Docker container to function correctly, these files must be placed in the project's working directory.
+AutoRecLab is an autonomous research agent for recommender-systems experimentation. It turns natural-language research tasks into executable code, evaluates the results, and iteratively improves solutions through tree search.
 
-**Setup Instructions:**
+## Table of Contents
 
-1. **Download the embeddings:** Get the files from [this link](https://1drv.ms/f/c/04375478f480c0d7/IgCMRP8a-P6yTKIUflpDpq0zAQGu9UPOn0rt_0VydNMC0iY?e=MyC9Yz). You can either download them as a ZIP archive and extract them, or download the folders directly.
-2. **Create the directory:** Inside your AutoRecLab working directory, create a new folder named `ragEmbeddings`.
-3. **Move the files:** Place the `lenskit`, `recbole`, and `omnirec` folders (which contain the `.pkl` and `.faiss` files) into the `ragEmbeddings` directory.
+- [Introduction](#introduction)
+- [Setup and Usage](#setup-and-usage)
+- [Configuration](#configuration)
+- [Outputs](#outputs)
+- [Contributing](#contributing)
 
-```text
-AutoRecLab/
-├── ragEmbeddings/
-│   ├── lenskit/
-│   │   ├── ... (.pkl and .faiss files)
-│   ├── omnirec/
-│   │   ├── ... (.pkl and .faiss files)
-│   └── recbole/
-│       └── ... (.pkl and .faiss files)
-├── Dockerfile
-├── docker-compose.yml
-└── ... (other AutoRecLab files)
-```
-> [!CAUTION]
-If errors occur while building the docker container it is most likely an issue regarding the docker-entrypoint.sh, which generates the ragEmbeddings automatically while building the container if they are not contained in your Working Directory.
-In that case, delete the line "ENTRYPOINT ["/app/docker-entrypoint.sh"]" from the Dockerfile.
+## Introduction
 
+AutoRecLab helps researchers move from a free-form experiment idea to runnable Python, intermediate artifacts, and a final report. It combines LLM-based planning with iterative execution, evaluation, and refinement loops tailored to recommender-systems workflows.
 
-# AutoRecLab v2 (Develop): Towards an Autonomous Recommender-Systems Researcher
+Core capabilities:
 
-AutoRecLab is an autonomous research agent for recommender-systems experimentation.
-It turns a natural-language research task into executable code, evaluates intermediate results, and improves solutions iteratively via tree search.
+- Natural-language to executable experiment generation
+- Iterative code improvement through tree search
+- Built-in execution, scoring, debugging, and refinement loops
+- Documentation-aware retrieval for OmniRec, LensKit, and RecBole via FAISS indices
+- Configurable runtime behavior through `config.toml` and environment variables
+- Optional type checking before execution for more reliable generated code
 
-For a full English documentation set, including setup, architecture, usage examples, and FAQ, see [docs/README.md](docs/README.md).
+For a fuller walkthrough of setup, architecture, usage examples, and FAQ, see [docs/README.md](docs/README.md).
 
-This `develop` branch is where new features are integrated continuously between paper releases.
+## Setup and Usage
 
-## Why this branch exists
+### Requirements
 
-Your project follows a publication-driven release process:
+- [Python](https://www.python.org/) >= 3.12
+- [Graphviz (`dot`)](https://graphviz.org/) available on `PATH`
+- [OpenAI API](https://openai.com/api/) key
+- [`uv`](https://docs.astral.sh/uv/) for the recommended local workflow
+- [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) for an isolated workflow with the runtime dependencies already installed
 
-- `develop`: active development, frequent changes, newest features
-- `main`: stable snapshot that is updated when a new releases are considered
+If you run AutoRecLab locally, you need to provide the Python environment and system requirements yourself, including Graphviz. The Docker workflow is often the easier starting point because the container already includes the project dependencies and tools such as `dot`.
 
-If you need reproducible, publication-stable behavior, use `main`.
-If you want the newest capabilities, use `develop`.
+If you need a minimal fallback, `pip install -e .` also works, but the repository is maintained primarily around `uv`.
 
-## Current v2 focus (develop)
+### Environment
 
-- Autonomous iterative code improvement with tree search
-- Requirement engineering from free-form research prompts
-- Built-in execution, scoring, and debugging loops
-- RAG-assisted documentation lookup (OmniRec, LensKit, RecBole) via FAISS indices
-- Configurable model/runtime behavior via `config.toml` and environment variables
-- Python type checking before code execution to improve a reliable execution of the generated code
+Create a `.env` file in the repository root:
 
-## Requirements
-
-- Python >= 3.12
-- One of:
-  - uv (https://docs.astral.sh/uv/) (recommended)
-  - Docker + Docker Compose
-  - pip (works, but uv is preferred in this project)
-- Graphviz (`dot`) available on `PATH` (required by runtime checks)
-- OpenAI API key (needed for LLM calls and embedding generation)
-
-## Quick start
-
-### Option A: Docker (recommended for isolated runs)
-
-1. Create `.env` in the repository root:
-
-	```env
-	OPENAI_API_KEY=your-key-here
-	```
-
-2. Run the sandbox container:
-
-	```bash
-	docker compose run --build sandbox
-	```
-
-Notes:
-- The container entrypoint generates/updates documentation embeddings on startup.
-- Outputs are written to `./sandbox` on the host (mounted to `/app/out` in the container).
-
-### Option B: Local with uv
-
-1. Install dependencies:
-
-	```bash
-	uv sync
-	```
-
-2. Create `.env` (same as above) or export your API key in the shell.
-
-3. (Recommended once) Generate documentation embeddings locally:
-
-	```bash
-	uv run python -m cli.embeddings.main generate --all
-	```
-
-4. Start AutoRecLab:
-
-	```bash
-	uv run main.py
-	```
-
-### Option C: Local with pip
-
-```bash
-pip install -e .
-python main.py
+```env
+OPENAI_API_KEY=your-openai-api-key
 ```
 
-## Running the agent
+Docker Compose reads this file automatically. For local runs, `uv run` also picks it up from the project root.
 
-After start, enter a multi-line research task and finish with `!start`:
+### Documentation Embeddings
 
-```text
-Enter you request, write "!start" to start:
-> Build a reproducible top-N recommendation experiment on MovieLens.
-> Compare two candidate algorithms and report NDCG@10, Recall@10.
-> !start
-```
+AutoRecLab uses FAISS-based documentation indices in `ragEmbeddings/` to ground code generation and framework lookups for OmniRec, LensKit, and RecBole.
 
-At runtime, AutoRecLab will:
-1. derive concrete code requirements,
-2. generate multiple candidate implementations,
-3. execute and evaluate them,
-4. debug/improve candidates iteratively,
-5. stop when iteration budget/satisfaction criteria are reached.
-
-
-## CLI Usage
-
-**Inline prompt:**
-```bash
-uv run main.py --prompt "Analyze the signal and generate a report"
-```
-
-**Load prompt from an file:**
-```bash
-uv run main.py --prompt-file ./my-prompt.txt
-```
-
-**Don't log entered prompt in /entered_prompt.txt:**
-```bash
-uv run main.py --prompt-no-log
-```
-
-**Initialize workspace:**
-```bash
-uv run main.py --init
-```
-
-**List all available datasets:**
-```bash
-uv run main.py --list-datasets
-```
-
-**List all available models:**
-```bash
-uv run main.py --list-models
-```
-
-**Set model:**
-```bash
-uv run main.py --model "gpt-4o"
-```
-
-**Append a timestamp to the output directory for this run:**
-```bash
-uv run main.py --timestamp-out-dir
-```
-
-## Embeddings / documentation index
-
-AutoRecLab uses FAISS vector stores in `ragEmbeddings/` for docs-aware coding.
-
-Generate/update manually:
+Generate the embeddings locally with:
 
 ```bash
 uv run python -m cli.embeddings.main generate --all
 ```
 
-Useful flags:
-- `--omnirec`, `--lenskit`, `--recbole` (select subset)
-- `-f` / `--force` (overwrite existing index)
-- `-o` (custom output directory)
+Generate only selected sources if needed:
+
+```bash
+uv run python -m cli.embeddings.main generate --omnirec --lenskit
+```
+
+Useful flags include `--omnirec`, `--lenskit`, `--recbole`, `--force`, and `--out`.
+
+When you run the Docker workflow, the container entrypoint generates embeddings on startup.
+
+If you do not want to generate the embeddings yourself, you can download pre-generated files from [this OneDrive folder](https://1drv.ms/f/c/04375478f480c0d7/IgCMRP8a-P6yTKIUflpDpq0zAQGu9UPOn0rt_0VydNMC0iY?e=MyC9Yz) and place the `lenskit`, `omnirec`, and `recbole` folders under `ragEmbeddings/`.
+
+### Run with Docker
+
+Use Docker when you want an isolated runtime that already has the project dependencies and required tools installed:
+
+```bash
+docker compose run --build sandbox
+```
+
+Compose reads `.env` automatically. By default, artifacts from Docker runs are written to `./sandbox` on the host and mounted to `/app/out` in the container. This workflow is useful when you want to avoid local setup friction, since the container already includes dependencies such as Graphviz `dot`.
+
+Once the container shell is open, start AutoRecLab with:
+
+```bash
+uv run main.py
+```
+
+### Run Locally with uv
+
+Install the project environment:
+
+```bash
+uv sync
+```
+
+Then start AutoRecLab:
+
+```bash
+uv run main.py
+```
+
+Example interactive prompt:
+
+```text
+Enter you request, write "!start" to start:
+> Build a reproducible top-N recommendation experiment on MovieLens.
+> Compare a popularity baseline and a matrix-factorization approach.
+> Report Recall@10 and NDCG@10.
+> !start
+```
+
+### Basic CLI Usage
+
+Common commands include:
+
+- Inline prompt: `uv run main.py --prompt "Analyze the signal and generate a report"`
+- Prompt from file: `uv run main.py --prompt-file ./my-prompt.txt`
+- Initialize the output workspace: `uv run main.py --init`
+- List available datasets: `uv run main.py --list-datasets`
+- List available models: `uv run main.py --list-models`
+- Override the model for one run: `uv run main.py --model "gpt-4o"`
+- Append a timestamp to the output directory: `uv run main.py --timestamp-out-dir`
+
+For more examples and workflows, see [docs/usage-and-examples.md](docs/usage-and-examples.md).
 
 ## Configuration
 
-Main config file: `config.toml`
+`config.toml` is the main configuration file for AutoRecLab. The checked-in file defines the repository's current runtime defaults. If `config.toml` is missing, AutoRecLab writes a fresh one using its built-in defaults before starting.
 
-Example (current defaults in this branch):
+The most commonly adjusted settings look like this:
 
 ```toml
 out_dir = "./out"
 
 [treesearch]
-num_draft_nodes = 3
-debug_prob = 0.3
-epsilon = 0.4
+num_draft_nodes = 2
 max_iterations = 5
+refinement_iterations = 2
 
 [exec]
 timeout = 5400
 enable_type_checking = true
-max_type_check_attempts = 3
 keep_only_relevant_files = false
 
-[agent]
-k_fold_validation = 1
-
 [agent.code]
-model = "gpt-5-mini"
-model_temp = 1.0
-request_timeout = 120
-max_retries = 3
+model = "gpt-5.4-mini"
 ```
 
-Note: If `config.toml` is missing, AutoRecLab will using default values shown above and use those defaults at runtime. If an existing `config.toml` omits only some parameters, AutoRecLab will apply default values for the missing parameters while keeping any values you provided. When no `config.toml` is found, AutoRecLab emits an informational console log message indicating that the default configuration is being written and used.
+You can also override settings with environment variables using the `ARL_` prefix and `__` for nesting:
 
-Environment override pattern:
-- Prefix: `ARL_`
-- Nested fields via `__`
-
-Examples:
 - `ARL_out_dir=./sandbox`
 - `ARL_treesearch__max_iterations=8`
-- `ARL_agent__code__model=gpt-5-mini`
+- `ARL_agent__code__model=gpt-5.4-mini`
 
-Logging level can be set via:
-- `ISGSA_LOG=DEBUG|INFO|WARNING|ERROR`
+Set the log level with `ISGSA_LOG=DEBUG|INFO|WARNING|ERROR`.
 
-Experiments with large datasets on limited disk space:
-- `keep_only_relevant_files=false`: All output generated by AutoRecLab per node is saved and logged
-- `keep_only_relevant_files=true`: Only the actual AutoRecLab output (in the form of code and results) is saved. Files such as saved trained models are deleted.
+If disk space matters, `keep_only_relevant_files=true` reduces saved artifacts by keeping only the generated code and final results instead of every intermediate file.
 
 ## Outputs
 
-Depending on your `out_dir`, AutoRecLab writes artifacts such as:
+By default, local runs write artifacts to `./out`. Docker runs write to `./sandbox` on the host because the container maps `/app/out` there. If you change `out_dir` or use `--timestamp-out-dir`, the same structure is created in the configured output folder.
 
-- `code_requirements.json` (engineered requirements)
-- `save.pkl` (tree state)
-- intermediate generated code/checkpoints/plots/metadata
-- execution logs (if you use shell redirection or helper scripts)
+Common artifacts include:
 
-Utility for visualizing saved tree state:
+- `summary.md` for the final run summary
+- `save.pkl` for the serialized tree state
+- `tree_render/` for rendered search-tree visualizations
+- `checkpoint/` for per-node code and execution artifacts
+- `statistics/` for aggregated run statistics and plots
+- `costs_log.csv` for model cost tracking
+- `entered_prompt.txt` for the logged user prompt unless `--prompt-no-log` is used
+- `workspace/` for execution-time working files
+
+To render a saved tree again manually, run:
 
 ```bash
 uv run viz.py -i ./out/save.pkl -o ./out/tree_render
 ```
 
-## Development workflow
+## Contributing
 
-Install development dependencies via `uv sync`, then run tests:
+Set up the development environment with:
 
 ```bash
-uv run pytest
+uv sync
+uv run pre-commit install
 ```
 
-Project includes:
-- unit tests under `tests/`
-- tree search core under `treesearch/`
-- embedding CLI under `cli/embeddings/`
-- utility package workspace member under `packages/dataloader/`
+Contributors should keep `pre-commit` installed so the hooks run automatically before commits. If you activate the local virtual environment, the same install command is also available as `pre-commit install`.
 
-## Repository structure (high level)
+The installed hooks currently cover Ruff linting and auto-fixes, Ruff formatting, and basic repository hygiene checks such as debug statements, trailing whitespace, YAML/TOML validation, and large added files.
 
-```text
-.
-├── main.py                    # Entry point
-├── config.toml                # Runtime config
-├── compose.yaml               # Docker sandbox service
-├── cli/embeddings/            # Embedding index tooling
-├── treesearch/                # Core agent/search/execution logic
-├── ragEmbeddings/             # FAISS indices for docs retrieval
-├── sandbox/                   # Sandbox outputs/workspace
-├── tests/                     # Tests
-└── viz.py                     # Tree rendering utility
-```
-
-## Documentation
-
-A detailed English documentation set is available in [docs/README.md](docs/README.md), covering setup, architecture, usage examples, and FAQ.
-
-## Known develop-branch caveats
-
-- Behavior and prompt contracts can change without notice.
-- Some experimental backend/model combinations may be incomplete.
-
----
-
-If you need stable, citable behavior for publication artifacts, use [`main`](../../tree/main).
-For active feature development and newest research tooling, stay on `develop`.
+For code changes, we also recommend running `uv run pytest` before opening a PR or after larger changes.
