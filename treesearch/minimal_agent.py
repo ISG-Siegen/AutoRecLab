@@ -758,6 +758,8 @@ class MinimalAgent:
         """
         logger.info("Summarizing results...")
 
+        term_out = "".join(node._term_out).strip()
+
         summary_prompt = {
             "Introduction": (
                 "You are an expert research assistant responding to the user in a conversational setting. "
@@ -770,7 +772,7 @@ class MinimalAgent:
             "User Request": user_request,
             "Experiment Code": node.code,
             "Experiment Output": (
-                node.term_out if node.term_out else "No experiment output available."
+                term_out if term_out else "No experiment output available."
             ),
             "Instructions": [
                 "1. Use the code to interpret what the experiment did and what metrics or results are relevant.",
