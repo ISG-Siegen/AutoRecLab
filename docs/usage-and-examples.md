@@ -90,6 +90,14 @@ uv run python -m cli.embeddings.main generate --all
 uv run main.py --prompt "Build a reproducible recommendation experiment on a small dataset and report ranking metrics."
 ```
 
+## Example Experiment: Explicit-to-Implicit Conversion on MovieLens1M
+
+For a feedback-conversion experiment report on `MovieLens1M` with implicit-threshold and explicit-rating comparisons, see [Example Experiment: Explicit-to-Implicit Conversion on MovieLens1M](example-run-feedback-conversion.md). It summarizes ranking and RMSE results, the saved figures, the search trace, and the verbatim supporting materials for the run.
+
+## Example Experiment: Dataset Pruning Effects on RMSE Across Three Datasets
+
+For a pruning-focused experiment report across `MovieLens1M`, `Amazon2018VideoGames`, and `Amazon2018MusicalInstruments`, see [Example Experiment: Dataset Pruning Effects on RMSE Across Three Datasets](example-run-pruning.md). It summarizes RMSE trends across pruning levels, the saved line plots, the search trace, and the verbatim supporting materials for the run.
+
 ## Output interpretation
 
 After a run completes, AutoRecLab typically writes:

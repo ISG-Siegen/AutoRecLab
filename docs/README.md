@@ -27,22 +27,24 @@ At a high level, AutoRecLab performs the following workflow:
 
 ## Documentation map
 
-- [Getting Started](getting-started.md) — prerequisites, installation, first run, Docker setup
-- [Architecture](architecture.md) — main components and internal execution flow
-- [Usage and Examples](usage-and-examples.md) — CLI usage, prompts, and sample workflows
-- [FAQ](faq.md) — common questions and troubleshooting guidance
+- [Getting Started](getting-started.md) - prerequisites, installation, first run, Docker setup
+- [Architecture](architecture.md) - main components and internal execution flow
+- [Usage and Examples](usage-and-examples.md) - CLI usage, prompts, and sample workflows
+- [Example Experiment: Explicit-to-Implicit Conversion on MovieLens1M](example-run-feedback-conversion.md) - feedback-conversion experiment report on MovieLens1M with implicit-threshold and explicit-rating comparisons
+- [Example Experiment: Dataset Pruning Effects on RMSE Across Three Datasets](example-run-pruning.md) - pruning-focused experiment report across MovieLens1M and two Amazon datasets
+- [FAQ](faq.md) - common questions and troubleshooting guidance
 
 ## Repository layout
 
 The main project areas are:
 
-- [main.py](../main.py) — command-line entry point
-- [config.py](../config.py) — configuration loading and environment overrides
-- [config.toml](../config.toml) — default runtime configuration
-- [treesearch/](../treesearch) — search logic, agents, execution, and scoring
-- [cli/embeddings/](../cli/embeddings) — documentation embedding generation
-- [utils/](../utils) — logging, path utilities, and statistics tracking
-- [viz.py](../viz.py) — visualization of the search tree
+- [main.py](../main.py) - command-line entry point
+- [config.py](../config.py) - configuration loading and environment overrides
+- [config.toml](../config.toml) - default runtime configuration
+- [treesearch/](../treesearch) - search logic, agents, execution, and scoring
+- [cli/embeddings/](../cli/embeddings) - documentation embedding generation
+- [utils/](../utils) - logging, path utilities, and statistics tracking
+- [viz.py](../viz.py) - visualization of the search tree
 
 ## Recommended first read
 

@@ -34,6 +34,8 @@ Core capabilities:
 
 For a fuller walkthrough of setup, architecture, usage examples, and FAQ, see [docs/README.md](docs/README.md).
 
+For concrete experiment reports, see [Example Experiment: Explicit-to-Implicit Conversion on MovieLens1M](docs/example-run-feedback-conversion.md) and [Example Experiment: Dataset Pruning Effects on RMSE Across Three Datasets](docs/example-run-pruning.md).
+
 ## Setup and Usage
 
 ### Requirements
