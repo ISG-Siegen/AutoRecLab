@@ -1,13 +1,9 @@
-> [!CAUTION]
-> This is the active **development branch** (`develop`) of AutoRecLab.
->
-> - Features can change at any time.
-> - Interfaces and prompts may be unstable.
-> - Experimental behavior is expected.
->
-> For the latest stable release, use the [`main`](../../tree/main) branch.
+> [!IMPORTANT]
+> **Looking for the latest features?** This branch contains the current stable release aka. **AutoRecLab v1.0.0**.
+> For active development and upcoming changes, please switch to the [`develop`](../../tree/develop) branch.
 
-# AutoRecLab
+
+# AutoRecLab v1.0.0
 
 AutoRecLab is an autonomous research agent for recommender-systems experimentation. It turns natural-language research tasks into executable code, evaluates the results, and iteratively improves solutions through tree search.
 
