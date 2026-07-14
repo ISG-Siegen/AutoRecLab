@@ -1,9 +1,7 @@
-import re
 from dataclasses import dataclass
 from typing import Callable, TypeAlias
 
 import backoff
-import black
 import jsonschema
 from dataclasses_json import DataClassJsonMixin
 
@@ -107,23 +105,6 @@ class FunctionSpec(DataClassJsonMixin):
             "type": "function",
             "function": {"name": self.name},
         }
-
-
-def is_valid_python_script(script):
-    """Check if a script is a valid Python script."""
-    try:
-        compile(script, "<string>", "exec")
-        return True
-    except SyntaxError:
-        return False
-
-
-def format_code(code) -> str:
-    """Format Python code using Black."""
-    try:
-        return black.format_str(code, mode=black.FileMode())
-    except black.parsing.InvalidInput:  # type: ignore
-        return code
 
 
 @backoff.on_predicate(

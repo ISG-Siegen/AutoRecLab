@@ -4,7 +4,10 @@ services:
       context: .
     volumes:
       - ./sandbox:/app/out
+      - ./ragEmbeddings:/app/ragEmbeddings
     env_file:
       - .env
+    environment:
+      - ARL_out_dir=/app/out
     stdin_open: true
     tty: true

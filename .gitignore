@@ -10,3 +10,14 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Config
+config.toml
+
+/sandbox
+
+# Generated embeddings
+/ragEmbeddings/*
+!/ragEmbeddings/.gitkeep
+
+/out

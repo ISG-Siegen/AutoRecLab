@@ -1,47 +1,92 @@
-import tomllib
 from pathlib import Path
 
 import tomli_w
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict, TomlConfigSettingsSource
 
-CONFIG_PATH = Path("./config.toml")
+from utils.log import _ROOT_LOGGER
+
+logger = _ROOT_LOGGER.getChild("config")
+
+CONFIG_PATH = Path("config.toml")
 
 
 class TreeSearchConfig(BaseSettings):
     num_draft_nodes: int = 3
     debug_prob: float = 0.3
-    epsilon: float = 0.3
+    epsilon: float = 0.4
     max_iterations: int = 10
+    refinement_iterations: int = 2
 
 
 class ExecConfig(BaseSettings):
-    timeout: int = 3600
-    workspace: str = "./out/workspace"
+    timeout: int = 5400
+    enable_type_checking: bool = True
+    max_type_check_attempts: int = 3
+    keep_only_relevant_files: bool = False
 
 
 class CodeConfig(BaseSettings):
-    model: str = "gpt-4.1"
+    model: str = "gpt-5-mini"
     model_temp: float = 1.0
+    request_timeout: int = 120
+    max_retries: int = 3
 
 
 class AgentConfig(BaseSettings):
     k_fold_validation: int = 1
+    evaluation_metrics: list[str] | None = None
     code: CodeConfig = CodeConfig()
 
 
 class Config(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="ARL_",
+        env_nested_delimiter="__",
+        toml_file=CONFIG_PATH,
+        frozen=False,
+    )
+
+    out_dir: str = "./out"
     treesearch: TreeSearchConfig = TreeSearchConfig()
     exec: ExecConfig = ExecConfig()
     agent: AgentConfig = AgentConfig()
 
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        toml_src = TomlConfigSettingsSource(settings_cls, CONFIG_PATH)
+        return (
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+            toml_src,
+            init_settings,
+        )
 
-def load_config():
+
+_CONFIG: Config | None = None
+
+
+def get_config() -> Config:
+    global _CONFIG
+    if _CONFIG is None:
+        _CONFIG = _load_config()
+    return _CONFIG
+
+
+def _load_config() -> Config:
+    config = Config()
     if not CONFIG_PATH.exists():
-        config = Config()
-        with CONFIG_PATH.open("wb") as conf_fh:
-            tomli_w.dump(config.model_dump(), conf_fh)
-        return config
+        # write default config if file doesn't exist
+        logger.warning(
+            "No config.toml found, writing default config.toml and using default configuration values."
+        )
+        CONFIG_PATH.write_text(tomli_w.dumps(config.model_dump(exclude_none=True)))
 
-    with CONFIG_PATH.open("rb") as conf_fh:
-        data = tomllib.load(conf_fh)
-        return Config(**data)
+    return config
